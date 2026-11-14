@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.21";
+  const VERSION = "1.24";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -644,7 +644,13 @@
   ._2-O4ZG0KrnSrzISHBKctFQ{border-radius:6px}
   ._2Szzh5sKyGgnLUR870zbDE{border-radius:8px!important}
   ._3yD46y5pd3zOGR7CzKs0mC{border-radius:8px!important;overflow:hidden}
-  img[src*="library_hero."]:not([src*="blur"]){-webkit-mask-image:linear-gradient(to bottom,#000 40%,rgba(0,0,0,.6) 62%,transparent 84%);mask-image:linear-gradient(to bottom,#000 40%,rgba(0,0,0,.6) 62%,transparent 84%)}
+  img[src*="library_hero."]:not([src*="blur"]){-webkit-mask-image:linear-gradient(to bottom,#000 22%,rgba(0,0,0,.45) 48%,transparent 74%)!important;mask-image:linear-gradient(to bottom,#000 22%,rgba(0,0,0,.45) 48%,transparent 74%)!important}
+  img[src*="library_hero_blur"]:not([class*="_3_IUV"]){-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,rgba(0,0,0,.3) 35%,transparent 62%)!important;mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,rgba(0,0,0,.3) 35%,transparent 62%)!important}
+  /* bodka vo farbe témy pri vybranej / označenej hre v zozname */
+  ._2-O4ZG0KrnSrzISHBKctFQ{position:relative}
+  ._2-O4ZG0KrnSrzISHBKctFQ._1UBpAXP408Ez_L_mXhW5Q9::before,._2-O4ZG0KrnSrzISHBKctFQ:hover::before{content:"";position:absolute;left:8px;top:50%;width:6px;height:6px;margin-top:-3px;
+    border-radius:50%;background:var(--psi-accent,#1a9fff);box-shadow:0 0 8px var(--psi-accent,#1a9fff);z-index:2;pointer-events:none}
+  ._2-O4ZG0KrnSrzISHBKctFQ:hover:not(._1UBpAXP408Ez_L_mXhW5Q9)::before{opacity:.55}
   #psi-settings .psi-card{border-radius:12px}
   `;
   /* ---------------- vlastná téma (Nastavenia → PSI → Vzhľad) ---------------- */
@@ -819,19 +825,25 @@
       const age = feedAge(h.textContent);
       h.dataset.psiAge = age == null ? "x" : String(age);
       if (age == null || age > FADE_DAYS) continue;
-      const card = h.parentElement && h.parentElement.lastElementChild;
-      if (!card || card === h) continue;
+      const group = h.parentElement && h.parentElement.lastElementChild;
+      if (!group || group === h) continue;
+      let posts = [...group.querySelectorAll(".UVeN0kaD3zv1feMj_mMw5")];
+      if (!posts.length) posts = [group];
       const a = Math.max(0, 1 - age / FADE_DAYS);                 // čím starší, tým slabší rámček
       const acc = THEME.accent || "#1a9fff";
-      card.classList.add("psi-newcard");
-      card.style.boxShadow = `0 0 0 ${a > .5 ? 2 : 1}px ${acc}${Math.round(a * 255).toString(16).padStart(2, "0")},` +
-        `0 0 ${Math.round(8 + 22 * a)}px ${acc}${Math.round(a * 140).toString(16).padStart(2, "0")}`;
       const posted = Date.now() / 1000 - age * 86400;
       const sincePlay = lastPlayed > 0 && posted > lastPlayed && age <= NEW_SINCE_PLAY_MAX;
-      if ((age <= NEW_DAYS || sincePlay) && !card.querySelector(".psi-newbadge")) {
-        const b = doc.createElement("span"); b.className = "psi-newbadge"; b.textContent = "NEW!!";
-        b.title = (age === 0 ? "Dnes" : age === 1 ? "Včera" : `Pred ${age} dňami`) + (sincePlay ? " · od tvojho posledného hrania" : "");
-        card.appendChild(b);
+      for (const post of posts) {
+        // len obsah príspevku – riadok s komentármi/👍 (posledný potomok) ostane mimo rámčeka
+        const card = post.children.length > 1 ? post.firstElementChild : post;
+        card.classList.add("psi-newcard");
+        card.style.boxShadow = `0 0 0 ${a > .5 ? 2 : 1}px ${acc}${Math.round(a * 255).toString(16).padStart(2, "0")},` +
+          `0 0 ${Math.round(8 + 22 * a)}px ${acc}${Math.round(a * 140).toString(16).padStart(2, "0")}`;
+        if ((age <= NEW_DAYS || sincePlay) && !card.querySelector(".psi-newbadge")) {
+          const b = doc.createElement("span"); b.className = "psi-newbadge"; b.textContent = "NEW!!";
+          b.title = (age === 0 ? "Dnes" : age === 1 ? "Včera" : `Pred ${age} dňami`) + (sincePlay ? " · od tvojho posledného hrania" : "");
+          card.appendChild(b);
+        }
       }
     }
     // dúhový pruh achievementov
