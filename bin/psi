@@ -1,0 +1,4 @@
+#!/bin/sh
+# Spúšťač: funguje aj cez symlink z ~/.local/bin
+ROOT="$(dirname "$(dirname "$(readlink -f "$0")")")"
+cd "$ROOT" && exec python3 -m psi "$@"

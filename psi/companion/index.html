@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PSI Companion</title>
+<meta name="theme-color" content="#070b1a">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PSI">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070b1a; --bg2:#0b1226; --panel:rgba(17,25,54,.72); --panel2:rgba(25,35,72,.6);
+  --line:rgba(148,163,255,.12); --line2:rgba(148,163,255,.22);
+  --text:#e7ecff; --muted:#8d96bd; --dim:#5d6690;
+  --cyan:#22d3ee; --violet:#8b5cf6; --grad:linear-gradient(135deg,#22d3ee,#8b5cf6);
+  --good:#34d399; --warn:#fbbf24; --bad:#f87171;
+  --glow:0 0 24px rgba(34,211,238,.18),0 0 48px rgba(139,92,246,.12);
+  --r:20px; --nav:68px;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+body{min-height:100dvh;background:
+  radial-gradient(900px 500px at 110% -10%,rgba(139,92,246,.20),transparent 60%),
+  radial-gradient(700px 450px at -20% 10%,rgba(34,211,238,.14),transparent 60%),var(--bg);background-attachment:fixed}
+h1,h2,h3,.num{font-family:"Space Grotesk",Inter,sans-serif;letter-spacing:-.02em;margin:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:var(--cyan);text-decoration:none}
+img{display:block}
+.hidden{display:none!important}
+
+/* ---------- layout ---------- */
+.app{max-width:560px;margin:0 auto;padding:calc(var(--safe-t) + 14px) 16px calc(var(--nav) + var(--safe-b) + 24px)}
+header.top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--bg2);border:1px solid var(--line2);box-shadow:var(--glow)}
+.logo svg{width:24px;height:24px}
+header.top h1{font-size:20px}
+header.top .sub{color:var(--muted);font-size:12.5px}
+header.top .sp{flex:1}
+.iconbtn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;border:1px solid var(--line);background:var(--panel)}
+.iconbtn svg{width:19px;height:19px;stroke:var(--muted)}
+
+.view{animation:viewIn .45s var(--ease) both}
+@keyframes viewIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.card+.card,.section{margin-top:14px}
+.section-title{display:flex;align-items:baseline;justify-content:space-between;margin:22px 4px 10px}
+.section-title h2{font-size:17px}
+.section-title span{color:var(--muted);font-size:12.5px}
+.muted{color:var(--muted)} .small{font-size:12.5px}
+.stagger>*{animation:rise .5s var(--ease) both}
+.stagger>*:nth-child(2){animation-delay:.04s}.stagger>*:nth-child(3){animation-delay:.08s}.stagger>*:nth-child(4){animation-delay:.12s}
+.stagger>*:nth-child(5){animation-delay:.16s}.stagger>*:nth-child(6){animation-delay:.2s}.stagger>*:nth-child(n+7){animation-delay:.24s}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* ---------- týždeň ---------- */
+.hero{position:relative;overflow:hidden;padding:22px 20px 18px}
+.hero::after{content:"";position:absolute;inset:-40% -30% auto auto;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.35),transparent 65%);pointer-events:none}
+.hero .label{color:var(--muted);font-size:13px;font-weight:500}
+.big{display:flex;align-items:baseline;gap:8px;margin:4px 0 2px}
+.big .num{font-size:64px;line-height:1;font-weight:700;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(34,211,238,.25))}
+.big .unit{font-family:"Space Grotesk";font-size:22px;color:var(--muted);font-weight:600}
+.hero .meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+.hero .meta b{color:var(--text);font-weight:600}
+.chart{display:grid;grid-template-columns:repeat(7,1fr);gap:9px;align-items:end;height:170px;margin-top:20px;position:relative}
+.bar{display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end}
+.bar .track{flex:1;min-height:0;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.bar .v{font-size:11px;color:var(--muted);font-weight:600;opacity:0;transition:opacity .4s .5s}
+.chart.go .bar .v{opacity:1}
+.bar .col{width:100%;max-width:34px;border-radius:10px 10px 6px 6px;background:linear-gradient(180deg,var(--cyan),var(--violet));height:0;transition:height .9s var(--ease);box-shadow:0 0 14px rgba(34,211,238,.25);position:relative}
+.bar .col.zero{background:var(--line);box-shadow:none;min-height:4px}
+.bar.today .col{box-shadow:0 0 0 2px rgba(255,255,255,.18),0 0 22px rgba(34,211,238,.45)}
+.bar .d{font-size:12px;color:var(--muted);font-weight:600}
+.bar.today .d{color:var(--cyan)}
+.gow{position:relative;overflow:hidden;padding:0;border-radius:var(--r)}
+.gow img{width:100%;aspect-ratio:460/215;object-fit:cover}
+.gow .shade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(7,11,26,.95))}
+.gow .txt{position:absolute;left:18px;right:18px;bottom:14px}
+.gow .tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 9px;border-radius:99px;background:rgba(7,11,26,.6);border:1px solid var(--line2);color:var(--cyan);backdrop-filter:blur(8px)}
+.gow h3{font-size:22px;margin:8px 0 2px;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+.gow .s{color:#c9d0f0;font-size:13px}
+.glowring{box-shadow:var(--glow);border:1px solid var(--line2)}
+.list{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px;padding:10px;border-radius:16px;background:var(--panel);border:1px solid var(--line)}
+.row img.thumb{width:92px;height:43px;border-radius:9px;object-fit:cover;flex:none;background:var(--bg2)}
+.row .body{flex:1;min-width:0}
+.row .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .sub{color:var(--muted);font-size:12.5px}
+.prog{height:5px;border-radius:9px;background:rgba(148,163,255,.1);margin-top:7px;overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--grad);border-radius:9px;transition:width 1s var(--ease)}
+.rank{font-family:"Space Grotesk";font-weight:700;color:var(--dim);width:18px;text-align:center;flex:none}
+.badges{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none}
+.badges::-webkit-scrollbar{display:none}
+.badge{flex:none;min-width:132px;padding:14px;border-radius:18px;background:linear-gradient(160deg,rgba(34,211,238,.12),rgba(139,92,246,.14));border:1px solid var(--line2)}
+.badge .e{font-size:26px} .badge b{display:block;margin-top:6px;font-family:"Space Grotesk"} .badge span{color:var(--muted);font-size:12px}
+.ach img{width:44px;height:44px;border-radius:10px;flex:none;background:var(--bg2)}
+.note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:rgba(34,211,238,.06);border:1px dashed rgba(34,211,238,.3);color:#b9c3ea;font-size:13px}
+.note code{background:rgba(255,255,255,.07);padding:1px 5px;border-radius:5px;font-size:12px}
+
+/* ---------- wishlist ---------- */
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 14px;padding:0 16px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:8px 14px;border-radius:99px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:13px;font-weight:600;transition:all .25s var(--ease)}
+.chip.on{color:#05101d;background:var(--grad);border-color:transparent;box-shadow:0 0 18px rgba(34,211,238,.3)}
+.salebar{display:flex;align-items:center;gap:12px;padding:14px 16px}
+.salebar .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--grad);flex:none;font-size:18px}
+.salebar b{font-family:"Space Grotesk"}
+.wcards{display:flex;flex-direction:column;gap:14px}
+.wcard{position:relative;border-radius:var(--r);overflow:hidden;background:var(--panel);border:1px solid var(--line);transition:transform .2s var(--ease)}
+.wcard:active{transform:scale(.985)}
+.wcard.sale{border-color:rgba(34,211,238,.35);box-shadow:0 0 30px rgba(34,211,238,.10)}
+.wcard .img{position:relative}
+.wcard .img img{width:100%;aspect-ratio:460/215;object-fit:cover;background:var(--bg2)}
+.wcard .img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(9,14,32,.85))}
+.wcard .medal{position:absolute;left:12px;top:12px;z-index:2;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
+.disc{position:absolute;right:12px;top:12px;z-index:2;font-family:"Space Grotesk";font-weight:700;font-size:17px;padding:6px 11px;border-radius:12px}
+.disc.real{background:var(--grad);color:#04101c;box-shadow:0 0 20px rgba(34,211,238,.45)}
+.disc.est{background:rgba(7,11,26,.72);color:#c4b5fd;border:1px dashed rgba(139,92,246,.7);backdrop-filter:blur(6px);font-size:15px}
+.wcard .b{padding:12px 16px 16px}
+.wcard h3{font-size:17px;line-height:1.25}
+.price{display:flex;align-items:baseline;gap:8px;margin-top:6px}
+.price .now{font-family:"Space Grotesk";font-weight:700;font-size:18px}
+.price s{color:var(--dim);font-size:13px}
+.cd{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-variant-numeric:tabular-nums;font-size:12.5px;font-weight:600;color:var(--warn);background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);padding:4px 9px;border-radius:99px}
+.cd.soon{color:var(--bad);border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.08);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 4px rgba(248,113,113,.08)}}
+.verdict{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:14px;font-size:13px}
+.verdict .pill{flex:none;font-weight:700;font-size:12px;padding:4px 10px;border-radius:99px;letter-spacing:.02em}
+.verdict.buy{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25)}
+.verdict.buy .pill{background:var(--good);color:#04140d}
+.verdict.wait{background:rgba(139,92,246,.09);border:1px solid rgba(139,92,246,.3)}
+.verdict.wait .pill{background:var(--violet);color:#fff}
+.verdict.info{background:var(--panel2);border:1px solid var(--line)}
+.verdict.info .pill{background:var(--line2)}
+.verdict span{color:#c3cbec}
+
+/* ---------- hľadať ---------- */
+.search{position:sticky;top:calc(var(--safe-t) + 8px);z-index:5;display:flex;align-items:center;gap:10px;padding:0 14px;height:52px;border-radius:16px;background:rgba(14,20,44,.9);border:1px solid var(--line2);backdrop-filter:blur(16px);transition:box-shadow .3s}
+.search:focus-within{box-shadow:0 0 0 3px rgba(34,211,238,.18),var(--glow)}
+.search svg{width:19px;height:19px;stroke:var(--muted);flex:none}
+.search input{flex:1;background:none;border:0;outline:0;color:var(--text);font:inherit;font-size:16px}
+.results{margin-top:14px}
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty .e{font-size:40px;margin-bottom:8px;filter:grayscale(.2)}
+
+/* ---------- sheet ---------- */
+.backdrop{position:fixed;inset:0;background:rgba(3,6,16,.6);backdrop-filter:blur(4px);z-index:40;opacity:0;transition:opacity .3s;pointer-events:none}
+.backdrop.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;max-height:88dvh;overflow:auto;background:#0c1330;border-top:1px solid var(--line2);border-radius:26px 26px 0 0;transform:translateY(105%);transition:transform .42s var(--ease);padding-bottom:calc(var(--safe-b) + 18px);box-shadow:0 -20px 60px rgba(0,0,0,.5)}
+.sheet.on{transform:none}
+.sheet .grab{width:42px;height:5px;border-radius:9px;background:var(--line2);margin:10px auto 0}
+.sheet .inner{max-width:560px;margin:0 auto;padding:14px 18px 0}
+.sheet .hdr{border-radius:16px;width:100%;aspect-ratio:460/215;object-fit:cover;background:var(--bg2)}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.kv div{padding:12px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+.kv small{display:block;color:var(--muted);font-size:11.5px}
+.kv b{font-family:"Space Grotesk";font-size:17px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:50px;margin-top:16px;border-radius:15px;background:var(--grad);color:#04101c;font-weight:700;box-shadow:0 0 24px rgba(34,211,238,.3)}
+
+/* ---------- nav ---------- */
+nav.bottom{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:8px 14px calc(var(--safe-b) + 8px);background:linear-gradient(180deg,rgba(7,11,26,0),rgba(7,11,26,.92) 30%)}
+nav.bottom .wrap{max-width:420px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);height:var(--nav);border-radius:22px;background:rgba(15,22,48,.85);border:1px solid var(--line2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);position:relative;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+nav.bottom button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--dim);font-size:11.5px;font-weight:600;position:relative;z-index:1;transition:color .3s}
+nav.bottom button svg{width:23px;height:23px;stroke:currentColor;transition:transform .35s var(--ease)}
+nav.bottom button.on{color:var(--text)}
+nav.bottom button.on svg{stroke:var(--cyan);transform:translateY(-2px);filter:drop-shadow(0 0 8px rgba(34,211,238,.6))}
+nav.bottom .ind{position:absolute;top:8px;bottom:8px;width:calc(33.333% - 16px);left:8px;border-radius:16px;background:linear-gradient(135deg,rgba(34,211,238,.14),rgba(139,92,246,.18));border:1px solid rgba(34,211,238,.22);transition:transform .45s var(--ease)}
+
+/* ---------- PTR, skeleton, toast ---------- */
+.ptr{position:fixed;top:calc(var(--safe-t) + 6px);left:50%;z-index:50;width:42px;height:42px;margin-left:-21px;border-radius:50%;display:grid;place-items:center;background:#111a3a;border:1px solid var(--line2);box-shadow:var(--glow);transform:translateY(-70px);opacity:0}
+.ptr svg{width:22px;height:22px;stroke:var(--cyan)}
+.ptr.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sk{background:linear-gradient(90deg,rgba(148,163,255,.06) 25%,rgba(148,163,255,.13) 50%,rgba(148,163,255,.06) 75%);background-size:200% 100%;animation:sh 1.3s infinite;border-radius:14px}
+@keyframes sh{to{background-position:-200% 0}}
+.toast{position:fixed;left:50%;bottom:calc(var(--nav) + var(--safe-b) + 26px);transform:translate(-50%,20px);z-index:60;padding:11px 16px;border-radius:14px;background:#1a2350;border:1px solid var(--line2);font-size:13.5px;opacity:0;transition:all .35s var(--ease);pointer-events:none;max-width:90vw}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- login ---------- */
+.login{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.login .logo{width:84px;height:84px;border-radius:26px;margin-bottom:22px;animation:float 5s ease-in-out infinite}
+.login .logo svg{width:48px;height:48px}
+@keyframes float{50%{transform:translateY(-6px);box-shadow:0 0 40px rgba(34,211,238,.3),0 0 70px rgba(139,92,246,.2)}}
+.login h1{font-size:28px}
+.login p{color:var(--muted);margin:8px 0 26px;max-width:300px}
+.pin{display:flex;gap:9px;position:relative}
+.pin .cell{width:46px;height:58px;border-radius:14px;display:grid;place-items:center;font-family:"Space Grotesk";font-size:26px;font-weight:700;background:var(--panel);border:1px solid var(--line2);transition:all .2s var(--ease)}
+.pin .cell.f{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(34,211,238,.15)}
+.pin .cell.full{background:linear-gradient(160deg,rgba(34,211,238,.14),rgba(139,92,246,.18))}
+.pin .cell:nth-child(3){margin-right:10px}
+.pin input{position:absolute;inset:0;opacity:0;font-size:16px;letter-spacing:40px;caret-color:transparent}
+.pin.shake{animation:shake .45s}
+@keyframes shake{20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
+.login .msg{min-height:22px;margin-top:16px;font-size:13.5px;color:var(--bad)}
+.login .ok .cell{border-color:var(--good);box-shadow:0 0 0 3px rgba(52,211,153,.2)}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ prihlásenie ============ -->
+<section id="login" class="login hidden">
+  <div class="logo glowring"><svg viewBox="0 0 64 64"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><path d="M32 11v41M20 15v12.5a12 12 0 0 0 24 0V15M24 52h16" fill="none" stroke="url(#lg)" stroke-width="5" stroke-linecap="round"/></svg></div>
+  <h1>PSI Companion</h1>
+  <p>Zadaj PIN z PC.<br><span class="small">Zobrazíš ho príkazom <code style="color:var(--cyan)">psi --companion</code></span></p>
+  <div class="pin" id="pin">
+    <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+    <input id="pinInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-label="PIN">
+  </div>
+  <div class="msg" id="pinMsg"></div>
+</section>
+
+<!-- ============ appka ============ -->
+<div id="app" class="app hidden">
+  <header class="top">
+    <div class="logo glowring"><svg viewBox="0 0 64 64"><defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><path d="M32 11v41M20 15v12.5a12 12 0 0 0 24 0V15M24 52h16" fill="none" stroke="url(#lg2)" stroke-width="5.5" stroke-linecap="round"/></svg></div>
+    <div><h1 id="title">Týždeň</h1><div class="sub" id="subtitle">PSI Companion</div></div>
+    <div class="sp"></div>
+    <button class="iconbtn" id="logout" aria-label="Odhlásiť"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+  </header>
+  <main id="main"></main>
+</div>
+
+<nav class="bottom hidden" id="nav">
+  <div class="wrap">
+    <div class="ind" id="ind"></div>
+    <button data-v="week"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Týždeň</button>
+    <button data-v="wishlist"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>Wishlist</button>
+    <button data-v="search"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Hľadať</button>
+  </div>
+</nav>
+
+<div class="ptr" id="ptr"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg></div>
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div class="inner" id="sheetBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl = u => /^https:\/\/[a-z0-9.-]+\.(steamstatic\.com|akamaihd\.net)\//i.test(u || "") ? u : "";
+
+/* ---------------- ProtonDB medaila (rovnaká ako v psi.js) ---------------- */
+const TIERS = {
+  native:   {c1:"#4ade80", c2:"#15803d", label:"Native"},
+  platinum: {c1:"#e5edf7", c2:"#8fa3bf", label:"Platinum"},
+  gold:     {c1:"#fde68a", c2:"#c99a1c", label:"Gold"},
+  silver:   {c1:"#e5e7eb", c2:"#9ca3af", label:"Silver"},
+  bronze:   {c1:"#f4b27a", c2:"#a0522d", label:"Bronze"},
+  borked:   {c1:"#fca5a5", c2:"#b91c1c", label:"Borked"},
+  pending:  {c1:"#6b7280", c2:"#374151", label:"Pending"},
+};
+let medalSeq = 0;
+function medal(tier, size = 34) {
+  const t = TIERS[tier] || TIERS.pending, id = "m" + (++medalSeq);
+  const glyph = tier === "borked" ? '<path d="M15 19l6 6M21 19l-6 6" stroke="#5b0d0d" stroke-width="2.4" stroke-linecap="round"/>'
+    : tier === "pending" ? '<text x="18" y="26.5" text-anchor="middle" font-size="11" font-weight="700" fill="#d1d5db" font-family="Space Grotesk,sans-serif">?</text>'
+    : '<path d="M18 15.6l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z" fill="rgba(255,255,255,.85)"/>';
+  return `<svg class="medal-svg" width="${size}" height="${size * 1.22}" viewBox="0 0 36 44" role="img" aria-label="ProtonDB ${t.label}">
+    <title>ProtonDB: ${t.label}</title>
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${t.c1}"/><stop offset="1" stop-color="${t.c2}"/></linearGradient></defs>
+    <path d="M9 0h7l3 9-6 4zM27 0h-7l-3 9 6 4z" fill="#22d3ee" opacity=".9"/><path d="M16 0h4l-2 8z" fill="#8b5cf6"/>
+    <circle cx="18" cy="23" r="13" fill="url(#${id})" stroke="rgba(0,0,0,.25)" stroke-width="1.2"/>
+    <circle cx="18" cy="23" r="9.6" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1"/>${glyph}</svg>`;
+}
+
+/* ---------------- formátovanie ---------------- */
+const fmtH = m => { const h = Math.floor(m / 60), mm = m % 60; return h ? `${h} h${mm ? " " + mm + " min" : ""}` : `${mm} min`; };
+const eur = c => c == null ? "" : (c / 100).toLocaleString("sk-SK", {style: "currency", currency: "EUR"});
+const daysTo = ts => Math.max(0, Math.ceil((ts * 1000 - Date.now()) / 864e5));
+function countdown(ts) {
+  let s = Math.max(0, Math.floor(ts - Date.now() / 1000));
+  const d = Math.floor(s / 86400); s %= 86400;
+  const h = Math.floor(s / 3600); s %= 3600;
+  const m = Math.floor(s / 60); s %= 60;
+  const p = n => String(n).padStart(2, "0");
+  return (d ? `${d} d ` : "") + `${p(h)}:${p(m)}:${p(s)}`;
+}
+const ago = ts => { const m = Math.round((Date.now() / 1000 - ts) / 60); return m < 1 ? "práve teraz" : m < 60 ? `pred ${m} min` : `pred ${Math.round(m / 60)} h`; };
+
+/* ---------------- API ---------------- */
+class AuthError extends Error {}
+async function api(path, {refresh = false} = {}) {
+  const r = await fetch(path + (refresh ? (path.includes("?") ? "&" : "?") + "refresh=1" : ""), {credentials: "same-origin", cache: "no-store"});
+  if (r.status === 401) throw new AuthError();
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+  return r.json();
+}
+let toastT;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2800); }
+function fail(e) {
+  if (e instanceof AuthError) return showLogin();
+  toast(navigator.onLine ? "Nepodarilo sa načítať dáta z PC" : "Si offline");
+}
+
+/* ---------------- login ---------------- */
+function showLogin(msg = "") {
+  $("#app").classList.add("hidden"); $("#nav").classList.add("hidden"); $("#login").classList.remove("hidden");
+  $("#pinMsg").textContent = msg;
+  const inp = $("#pinInput"); inp.value = ""; paintPin(); setTimeout(() => inp.focus(), 250);
+}
+function paintPin() {
+  const v = $("#pinInput").value;
+  $$("#pin .cell").forEach((c, i) => { c.textContent = v[i] ? "•" : ""; c.classList.toggle("full", !!v[i]); c.classList.toggle("f", i === v.length); });
+}
+let lockT;
+async function submitPin(pin) {
+  const inp = $("#pinInput"), box = $("#pin");
+  inp.disabled = true;
+  try {
+    const r = await fetch("/api/login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pin}), credentials: "same-origin"});
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { box.classList.add("ok"); setTimeout(() => { box.classList.remove("ok"); startApp(); }, 350); return; }
+    box.classList.remove("shake"); void box.offsetWidth; box.classList.add("shake");
+    if (navigator.vibrate) navigator.vibrate(120);
+    inp.value = ""; paintPin();
+    if (r.status === 429) {
+      let left = j.retry_after || 60; clearInterval(lockT);
+      const tick = () => { $("#pinMsg").textContent = `Príliš veľa pokusov. Skús znova o ${left} s.`; if (left-- <= 0) { clearInterval(lockT); $("#pinMsg").textContent = ""; inp.disabled = false; inp.focus(); } };
+      tick(); lockT = setInterval(tick, 1000); return;
+    }
+    $("#pinMsg").textContent = j.error === "wrong_pin" ? `Nesprávny PIN · zostáva ${j.attempts_left} ${j.attempts_left === 1 ? "pokus" : j.attempts_left < 5 && j.attempts_left > 1 ? "pokusy" : "pokusov"}` : "Chyba prihlásenia";
+  } catch { $("#pinMsg").textContent = "PC je nedostupné"; }
+  inp.disabled = false; inp.focus();
+}
+$("#pinInput").addEventListener("input", e => {
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6); paintPin();
+  if (e.target.value.length === 6) submitPin(e.target.value);
+});
+$("#pin").addEventListener("click", () => $("#pinInput").focus());
+$("#logout").addEventListener("click", async () => {
+  if (!confirm("Odhlásiť tento telefón?")) return;
+  await fetch("/api/logout", {method: "POST", credentials: "same-origin"}).catch(() => {});
+  showLogin();
+});
+
+/* ---------------- router ---------------- */
+const VIEWS = {week: renderWeek, wishlist: renderWishlist, search: renderSearch};
+const TITLES = {week: "Týždeň", wishlist: "Wishlist", search: "Hľadať"};
+let current = null;
+function go(v, opts = {}) {
+  if (!VIEWS[v]) v = "week";
+  const changed = v !== current;
+  current = v;
+  if (location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
+  const idx = Object.keys(VIEWS).indexOf(v);
+  $("#ind").style.transform = `translateX(calc(${idx * 100}% + ${idx * 16}px))`;
+  $$("nav.bottom button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  $("#title").textContent = TITLES[v];
+  if (changed) window.scrollTo({top: 0});
+  return VIEWS[v](opts);
+}
+$$("nav.bottom button").forEach(b => b.addEventListener("click", () => { if (b.dataset.v !== current) go(b.dataset.v); }));
+window.addEventListener("hashchange", () => go(location.hash.slice(1)));
+
+function mount(html) { const m = $("#main"); m.innerHTML = `<div class="view">${html}</div>`; return m.firstElementChild; }
+const skeleton = (rows = 3, h = 190) => `<div class="sk" style="height:${h}px;margin-bottom:14px"></div>` + Array.from({length: rows}, () => '<div class="sk" style="height:64px;margin-bottom:10px"></div>').join("");
+function imgFallback(root) { $$("img", root).forEach(i => i.addEventListener("error", () => { i.style.visibility = "hidden"; }, {once: true})); }
+
+/* ---------------- Týždeň ---------------- */
+const cache = {};
+async function renderWeek({refresh = false} = {}) {
+  if (!cache.week) mount(skeleton(4, 300));
+  let w;
+  try { w = cache.week = await api("/api/week", {refresh}); } catch (e) { return fail(e); }
+  if (current !== "week") return;
+  $("#subtitle").textContent = "Posledných 7 dní · " + ago(w.generated);
+  const max = Math.max(60, ...w.days.map(d => d.minutes));
+  const hours = w.total_minutes / 60;
+  const g = w.game_of_week;
+  const root = mount(`
+    <div class="stagger">
+      <div class="card hero glowring">
+        <div class="label">Odohrané za týždeň</div>
+        <div class="big"><span class="num" id="bigNum">0</span><span class="unit">${hours >= 1 ? "hodín" : "minút"}</span></div>
+        <div class="meta">
+          <span><b>${w.days.filter(d => d.minutes).length}</b>/7 dní</span>
+          <span><b>${w.top.length}</b> ${w.top.length === 1 ? "hra" : "hier"}</span>
+          ${w.best_day ? `<span>Najviac: <b>${esc(w.best_day.label)}</b> ${fmtH(w.best_day.minutes)}</span>` : ""}
+        </div>
+        <div class="chart" id="chart">
+          ${w.days.map(d => `<div class="bar ${d.today ? "today" : ""}"><span class="v">${d.minutes ? (d.minutes >= 60 ? (d.minutes / 60).toFixed(1) + "h" : d.minutes + "m") : ""}</span><div class="track"><div class="col ${d.minutes ? "" : "zero"}" data-h="${d.minutes / max * 100}"></div></div><span class="d">${esc(d.label)}</span></div>`).join("")}
+        </div>
+      </div>
+      ${w.coverage < 7 ? `<div class="note section"><span>📡</span><div>PSI zbiera denné snímky (${w.coverage}/7 dní). Graf sa naplní, keď bude služba bežať aspoň týždeň.</div></div>` : ""}
+      ${g ? `
+      <div class="section-title"><h2>Hra týždňa</h2><span>${g.share} % času</span></div>
+      <div class="card gow glowring" data-app="${g.appid}">
+        <img src="${esc(safeUrl(g.header))}" alt="" loading="lazy">
+        <div class="shade"></div>
+        <div class="txt"><span class="tag">★ Hra týždňa</span><h3>${esc(g.name)}</h3><div class="s">${fmtH(g.minutes)} · ${g.days} ${g.days === 1 ? "deň" : g.days < 5 ? "dni" : "dní"}</div></div>
+      </div>` : ""}
+      ${w.top.length > 1 ? `
+      <div class="section-title"><h2>Top hry</h2><span>${fmtH(w.total_minutes)}</span></div>
+      <div class="list">${w.top.map((t, i) => `
+        <div class="row" data-app="${t.appid}"><span class="rank">${i + 1}</span>
+          <img class="thumb" src="${esc(safeUrl(t.header))}" alt="" loading="lazy">
+          <div class="body"><div class="name">${esc(t.name)}</div><div class="sub">${fmtH(t.minutes)} · ${t.share} %</div><div class="prog"><i data-w="${t.share}"></i></div></div>
+        </div>`).join("")}</div>` : ""}
+      ${w.badges.length ? `
+      <div class="section-title"><h2>Odznaky</h2><span>${w.badges.length}</span></div>
+      <div class="badges">${w.badges.map(b => `<div class="badge"><div class="e">${esc(b.icon)}</div><b>${esc(b.name)}</b><span>${esc(b.desc)}</span></div>`).join("")}</div>` : ""}
+      <div class="section-title"><h2>Achievementy</h2><span>${w.achievements.length ? w.achievements.length + " nových" : ""}</span></div>
+      ${w.achievements.length ? `<div class="list">${w.achievements.map(a => `
+        <div class="row ach"><img src="${esc(safeUrl(a.icon))}" alt="" loading="lazy">
+          <div class="body"><div class="name">${esc(a.name)}</div><div class="sub">${esc(a.game)} · ${new Date(a.unlocked * 1000).toLocaleDateString("sk-SK", {weekday: "short", day: "numeric", month: "numeric"})}</div>${a.description ? `<div class="sub" style="color:var(--dim)">${esc(a.description)}</div>` : ""}</div>
+        </div>`).join("")}</div>`
+      : w.achievements_enabled ? `<div class="empty"><div class="e">🏆</div>Tento týždeň žiadne nové achievementy.</div>`
+      : `<div class="note"><span>🔑</span><div>Pre achievementy pridaj do <code>~/.local/share/psi/config.json</code> kľúč <code>steam_api_key</code> (steamcommunity.com/dev/apikey).</div></div>`}
+    </div>`);
+  imgFallback(root);
+  $$("[data-app]", root).forEach(el => el.addEventListener("click", () => openGame(+el.dataset.app)));
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $$(".col", root).forEach((c, i) => setTimeout(() => c.style.height = Math.max(c.classList.contains("zero") ? 3 : 6, +c.dataset.h) + "%", i * 55));
+    $("#chart", root).classList.add("go");
+    $$(".prog i", root).forEach(i => i.style.width = i.dataset.w + "%");
+  }));
+  countUp($("#bigNum", root), hours >= 1 ? hours : w.total_minutes, hours >= 1 && hours < 100 ? 1 : 0);
+}
+function countUp(el, to, dec) {
+  const t0 = performance.now(), dur = 1100;
+  const step = t => { const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 4);
+    el.textContent = (to * e).toLocaleString("sk-SK", {minimumFractionDigits: dec, maximumFractionDigits: dec});
+    if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+/* ---------------- Wishlist ---------------- */
+let wFilter = "all";
+const FILTERS = {all: ["Všetko", () => true], sale: ["V zľave", i => i.discount > 0], buy: ["Kúp teraz", i => i.deal?.verdict === "buy"],
+  linux: ["Ide na Linuxe", i => ["platinum", "gold", "native"].includes(i.protondb?.tier)]};
+function discBadge(i) {
+  if (i.discount > 0) return `<span class="disc real">−${i.discount} %</span>`;
+  const est = i.deal?.estimate;
+  return est ? `<span class="disc est" title="Odhad najbližšej zľavy">≈ −${est} %</span>` : "";
+}
+function verdictBox(d) {
+  if (!d || !d.verdict) return "";
+  const label = {buy: "Kúp teraz", wait: "Počkaj", info: "Info"}[d.verdict] || d.verdict;
+  return `<div class="verdict ${esc(d.verdict)}"><span class="pill">${label}</span><span>${esc(d.reason)}</span></div>`;
+}
+function cdChip(ts) { return ts ? `<span class="cd ${ts - Date.now() / 1000 < 86400 ? "soon" : ""}" data-end="${ts}">⏱ <b>${countdown(ts)}</b></span>` : ""; }
+function wcard(i) {
+  return `<article class="wcard ${i.discount ? "sale" : ""}" data-app="${i.appid}">
+    <div class="img"><img src="${esc(safeUrl(i.header))}" alt="" loading="lazy"><div class="medal">${medal(i.protondb?.tier, 32)}</div>${discBadge(i)}</div>
+    <div class="b"><h3>${esc(i.name)}</h3>
+      <div class="price">${i.is_free ? '<span class="now">Zadarmo</span>' : i.price_fmt ? `<span class="now">${esc(i.price_fmt)}</span>${i.discount ? `<s>${esc(i.price_full_fmt)}</s>` : ""}` : '<span class="muted small">Nedostupné</span>'}
+      ${cdChip(i.discount_end)}</div>
+      ${verdictBox(i.deal)}
+    </div></article>`;
+}
+async function renderWishlist({refresh = false} = {}) {
+  if (!cache.wishlist) mount(`<div class="sk" style="height:66px;margin-bottom:14px"></div>` + skeleton(0, 250) + skeleton(0, 250));
+  let w;
+  try { w = cache.wishlist = await api("/api/wishlist", {refresh}); } catch (e) { return fail(e); }
+  if (current !== "wishlist") return;
+  $("#subtitle").textContent = `${w.items.length} hier · ${w.on_sale} v zľave`;
+  const s = w.next_sale;
+  const list = w.items.filter(FILTERS[wFilter][1]);
+  const root = mount(`
+    ${s ? `<div class="card salebar glowring"><div class="ic">🛒</div><div><b>${esc(s.name)}</b><div class="small muted">${s.active ? "Práve prebieha · končí " + new Date(s.end * 1000).toLocaleDateString("sk-SK") : "začína o " + daysTo(s.start) + " d · " + new Date(s.start * 1000).toLocaleDateString("sk-SK", {day: "numeric", month: "long"})}</div></div></div>` : ""}
+    <div class="chips" style="margin-top:14px">${Object.entries(FILTERS).map(([k, [l, f]]) => `<button class="chip ${k === wFilter ? "on" : ""}" data-f="${k}">${l} <span style="opacity:.6">${w.items.filter(f).length}</span></button>`).join("")}</div>
+    ${w.error === "no_steam_user" ? `<div class="empty"><div class="e">🙈</div>Nenašiel som prihláseného Steam používateľa.</div>`
+      : list.length ? `<div class="wcards stagger">${list.map(wcard).join("")}</div>`
+      : `<div class="empty"><div class="e">🪄</div>${w.items.length ? "Nič nezodpovedá filtru." : "Wishlist je prázdny alebo súkromný."}</div>`}`);
+  imgFallback(root);
+  $$(".chip", root).forEach(c => c.addEventListener("click", () => { wFilter = c.dataset.f; renderWishlist(); }));
+  $$(".wcard", root).forEach(el => el.addEventListener("click", () => openGame(+el.dataset.app)));
+}
+
+/* ---------------- Hľadať ---------------- */
+let sQuery = "", sTimer, sSeq = 0;
+function renderSearch() {
+  $("#subtitle").textContent = "Obchod · ProtonDB · zľavy";
+  const root = mount(`
+    <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="Hľadaj hru…" autocomplete="off" enterkeyhint="search" value="${esc(sQuery)}"></label>
+    <div class="results" id="results"></div>`);
+  const q = $("#q", root);
+  q.addEventListener("input", () => { clearTimeout(sTimer); sTimer = setTimeout(() => doSearch(q.value), 350); });
+  q.addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(sTimer); doSearch(q.value); q.blur(); } });
+  if (sQuery) doSearch(sQuery); else emptySearch();
+}
+function emptySearch() { $("#results").innerHTML = `<div class="empty"><div class="e">🔭</div>Napíš názov hry – ukážem ProtonDB medailu, cenu a či sa oplatí čakať na zľavu.</div>`; }
+async function doSearch(v) {
+  sQuery = v.trim();
+  const box = $("#results"); if (!box) return;
+  if (sQuery.length < 2) return emptySearch();
+  const seq = ++sSeq;
+  box.innerHTML = skeleton(4, 0);
+  let r;
+  try { r = await api("/api/search?q=" + encodeURIComponent(sQuery)); } catch (e) { return fail(e); }
+  if (seq !== sSeq || !$("#results")) return;
+  box.innerHTML = r.items.length ? `<div class="list stagger">${r.items.map(i => `
+    <div class="row" data-app="${i.appid}">
+      <img class="thumb" src="${esc(safeUrl(i.image))}" alt="" loading="lazy">
+      <div class="body"><div class="name">${esc(i.name)}</div>
+        <div class="sub">${i.price == null ? "Zadarmo / bez ceny" : i.price < i.price_full ? `<b style="color:var(--cyan)">${eur(i.price)}</b> <s>${eur(i.price_full)}</s> · −${Math.round((1 - i.price / i.price_full) * 100)} %` : eur(i.price)}${i.linux ? " · 🐧 natívne" : ""}</div></div>
+      <div style="flex:none">${medal(i.linux ? "native" : i.protondb?.tier, 26)}</div>
+    </div>`).join("")}</div>` : `<div class="empty"><div class="e">🤷</div>Nič som nenašiel.</div>`;
+  imgFallback(box);
+  $$("[data-app]", box).forEach(el => el.addEventListener("click", () => openGame(+el.dataset.app)));
+}
+
+/* ---------------- detail hry (sheet) ---------------- */
+async function openGame(appid) {
+  const body = $("#sheetBody");
+  body.innerHTML = `<div class="sk" style="aspect-ratio:460/215;border-radius:16px"></div><div class="sk" style="height:26px;margin:14px 0;width:70%"></div><div class="sk" style="height:140px"></div>`;
+  $("#sheet").scrollTop = 0;
+  $("#backdrop").classList.add("on"); $("#sheet").classList.add("on");
+  let g;
+  try { g = await api("/api/game/" + appid); } catch (e) { closeSheet(); return fail(e); }
+  if (g.error) { body.innerHTML = `<div class="empty">Hru sa nepodarilo načítať.</div>`; return; }
+  const p = g.protondb || {}, d = g.deal || {}, t = TIERS[p.tier] || TIERS.pending;
+  const low = d.lowest ? `−${d.lowest.pct} %` : d.best_ever ? `−${d.best_ever} %` : "—";
+  body.innerHTML = `
+    <div style="position:relative"><img class="hdr" src="${esc(safeUrl(g.header))}" alt="">${discBadge(g)}</div>
+    <div style="display:flex;gap:14px;align-items:center;margin-top:14px">
+      ${medal(p.tier, 40)}
+      <div style="min-width:0"><h2 style="font-size:21px">${esc(g.name)}</h2>
+      <div class="small muted">ProtonDB <b style="color:${t.c1}">${t.label}</b>${p.reports ? ` · ${p.reports} hlásení` : ""}${p.trending && p.trending !== p.tier ? ` · trend ${esc(TIERS[p.trending]?.label || p.trending)}` : ""}</div></div>
+    </div>
+    <div class="kv">
+      <div><small>Cena</small><b>${g.is_free ? "Zadarmo" : esc(g.price_fmt || "—")}</b>${g.discount ? ` <s class="small muted">${esc(g.price_full_fmt)}</s>` : ""}</div>
+      <div><small>${d.on_sale ? "Zľava končí" : "Odhad zľavy"}</small><b>${d.on_sale && d.ends ? `<span data-end="${d.ends}">${countdown(d.ends)}</span>` : d.estimate ? "≈ −" + d.estimate + " %" : "—"}</b></div>
+      <div><small>Historické minimum</small><b>${low}</b></div>
+      <div><small>Najbližší výpredaj</small><b>${d.next_sale ? (d.next_sale.active ? "teraz" : "o " + daysTo(d.next_sale.start) + " d") : "—"}</b></div>
+    </div>
+    ${verdictBox(d)}
+    <a class="btn" href="https://store.steampowered.com/app/${+g.appid}/" target="_blank" rel="noopener noreferrer">Otvoriť v Steame ↗</a>`;
+  imgFallback(body);
+}
+function closeSheet() { $("#backdrop").classList.remove("on"); $("#sheet").classList.remove("on"); }
+$("#backdrop").addEventListener("click", closeSheet);
+(() => { // potiahnutie sheetu nadol zavrie
+  const sh = $("#sheet"); let y0 = null, dy = 0;
+  sh.addEventListener("touchstart", e => { if (sh.scrollTop <= 0) { y0 = e.touches[0].clientY; dy = 0; sh.style.transition = "none"; } }, {passive: true});
+  sh.addEventListener("touchmove", e => { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); sh.style.transform = `translateY(${dy}px)`; }, {passive: true});
+  sh.addEventListener("touchend", () => { if (y0 == null) return; sh.style.transition = ""; sh.style.transform = ""; if (dy > 110) closeSheet(); y0 = null; });
+})();
+
+/* ---------------- živé odpočty ---------------- */
+setInterval(() => {
+  $$("[data-end]").forEach(el => {
+    const ts = +el.dataset.end, b = el.querySelector("b") || el;
+    b.textContent = ts > Date.now() / 1000 ? countdown(ts) : "skončila";
+    if (el.classList.contains("cd")) el.classList.toggle("soon", ts - Date.now() / 1000 < 86400);
+  });
+}, 1000);
+
+/* ---------------- pull-to-refresh ---------------- */
+(() => {
+  const ptr = $("#ptr"); let y0 = null, dist = 0, busy = false;
+  const TH = 80;
+  window.addEventListener("touchstart", e => {
+    if (busy || window.scrollY > 0 || $("#sheet").classList.contains("on") || $("#app").classList.contains("hidden")) return;
+    y0 = e.touches[0].clientY; dist = 0; ptr.style.transition = "none";
+  }, {passive: true});
+  window.addEventListener("touchmove", e => {
+    if (y0 == null) return;
+    dist = Math.max(0, e.touches[0].clientY - y0);
+    if (window.scrollY > 0) { y0 = null; return; }
+    const pull = Math.min(130, dist * .5);
+    ptr.style.opacity = Math.min(1, pull / 50);
+    ptr.style.transform = `translateY(${pull - 60}px) rotate(${dist * 1.6}deg)`;
+  }, {passive: true});
+  window.addEventListener("touchend", async () => {
+    if (y0 == null) return; y0 = null;
+    ptr.style.transition = "transform .35s cubic-bezier(.22,1,.36,1), opacity .35s";
+    if (dist * .5 < TH * .6) { ptr.style.transform = "translateY(-70px)"; ptr.style.opacity = 0; return; }
+    busy = true; ptr.classList.add("spin"); ptr.style.transform = "translateY(14px)"; ptr.style.opacity = 1;
+    if (navigator.vibrate) navigator.vibrate(15);
+    try { await go(current, {refresh: true}); } finally {
+      busy = false; ptr.classList.remove("spin"); ptr.style.transform = "translateY(-70px)"; ptr.style.opacity = 0;
+    }
+  });
+})();
+
+/* ---------------- štart ---------------- */
+function startApp() {
+  $("#login").classList.add("hidden"); $("#app").classList.remove("hidden"); $("#nav").classList.remove("hidden");
+  go(location.hash.slice(1) || "week");
+}
+(async () => {
+  try {
+    const s = await (await fetch("/api/session", {credentials: "same-origin", cache: "no-store"})).json();
+    s.authed ? startApp() : showLogin(s.attempts_left === 0 ? "Príliš veľa pokusov, chvíľu počkaj." : "");
+  } catch { showLogin("PC je nedostupné – beží služba psi?"); }
+})();
+</script>
+</body>
+</html>

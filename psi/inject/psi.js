@@ -1,0 +1,702 @@
+/* PSI – vkladá sa do Steam SharedJSContext.
+ * Most do Python služby: window.__psiBridge (Runtime.addBinding) → odpoveď cez window.__psiReply.
+ * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
+(function () {
+  "use strict";
+  const VERSION = "1.18";
+  if (window.__psiLoaded === VERSION) return;
+  // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
+  try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
+  window.__psiLoaded = VERSION;
+
+  /* ---------------- most ---------------- */
+  const pending = new Map();
+  let seq = 0;
+  window.__psiReply = (id, r) => {
+    const p = pending.get(id);
+    if (!p) return;
+    pending.delete(id);
+    r && r.ok ? p.res(r.result) : p.rej(new Error((r && r.error) || "PSI error"));
+  };
+  function call(method, params = {}) {
+    return new Promise((res, rej) => {
+      if (typeof window.__psiBridge !== "function") return rej(new Error("PSI služba nie je pripojená"));
+      const id = ++seq;
+      pending.set(id, {res, rej});
+      window.__psiBridge(JSON.stringify({id, method, params}));
+      setTimeout(() => pending.delete(id) && rej(new Error("timeout")), 60000);
+    });
+  }
+
+  /* ---------------- ProtonDB medaila (zdieľaná s Companion) ---------------- */
+  const TIERS = {
+    native: {c1: "#4ade80", c2: "#15803d", label: "Native"},
+    platinum: {c1: "#e5edf7", c2: "#8fa3bf", label: "Platinum"},
+    gold: {c1: "#fde68a", c2: "#c99a1c", label: "Gold"},
+    silver: {c1: "#e5e7eb", c2: "#9ca3af", label: "Silver"},
+    bronze: {c1: "#f4b27a", c2: "#a0522d", label: "Bronze"},
+    borked: {c1: "#fca5a5", c2: "#b91c1c", label: "Borked"},
+    pending: {c1: "#6b7280", c2: "#374151", label: "Pending"},
+  };
+  let medalSeq = 0;
+  function medal(tier, size = 34) {
+    const t = TIERS[tier] || TIERS.pending, id = "psim" + (++medalSeq);
+    const glyph = tier === "borked" ? '<path d="M15 19l6 6M21 19l-6 6" stroke="#5b0d0d" stroke-width="2.4" stroke-linecap="round"/>'
+      : tier === "pending" ? '<text x="18" y="26.5" text-anchor="middle" font-size="11" font-weight="700" fill="#d1d5db" font-family="sans-serif">?</text>'
+      : '<path d="M18 15.6l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z" fill="rgba(255,255,255,.85)"/>';
+    return `<svg width="${size}" height="${size * 1.22}" viewBox="0 0 36 44"><title>ProtonDB: ${t.label}</title>
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${t.c1}"/><stop offset="1" stop-color="${t.c2}"/></linearGradient></defs>
+      <path d="M9 0h7l3 9-6 4zM27 0h-7l-3 9 6 4z" fill="#22d3ee" opacity=".9"/><path d="M16 0h4l-2 8z" fill="#8b5cf6"/>
+      <circle cx="18" cy="23" r="13" fill="url(#${id})" stroke="rgba(0,0,0,.25)" stroke-width="1.2"/>
+      <circle cx="18" cy="23" r="9.6" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1"/>${glyph}</svg>`;
+  }
+  window.PSI = {call, medal, TIERS};
+
+  /* ---------------- pomocné ---------------- */
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const fmtH = m => { const h = Math.floor(m / 60), mm = m % 60; return h ? `${h} h ${mm} min` : `${mm} min`; };
+  function openUrl(url) {
+    try { if (window.SteamClient && SteamClient.System && SteamClient.System.OpenInSystemBrowser) return SteamClient.System.OpenInSystemBrowser(url); } catch (e) {}
+    window.open(url, "_blank");
+  }
+  function qrSvg(matrix, px = 4) {
+    if (!matrix || !matrix.length) return "";
+    const n = matrix.length, q = 4, size = (n + 2 * q) * px;
+    let d = "";
+    matrix.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === "1") d += `M${(x + q) * px} ${(y + q) * px}h${px}v${px}h-${px}z`; });
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="100%" height="100%" rx="10" fill="#fff"/><path d="${d}" fill="#0b1226"/></svg>`;
+  }
+
+  const PSI_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none"><path d="M18 5v26M10.5 8v7.5a7.5 7.5 0 0 0 15 0V8M13 31h10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`;
+
+  const CSS = `
+  #psi-settings{--c:#22d3ee;--v:#8b5cf6}
+  #psi-settings .DialogBody{overflow:visible}
+  #psi-settings .psi-card{position:relative;flex:none;margin:0 0 16px;padding:16px 18px;border-radius:8px;
+    background:linear-gradient(135deg,rgba(34,211,238,.07),rgba(139,92,246,.10));border:1px solid rgba(139,92,246,.28);
+    box-shadow:0 0 24px rgba(34,211,238,.06)}
+  #psi-settings .psi-h{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8d96bd;margin-bottom:8px}
+  #psi-settings .psi-big{font-size:42px;font-weight:700;line-height:1;background:linear-gradient(135deg,var(--c),var(--v));-webkit-background-clip:text;color:transparent}
+  #psi-settings .psi-mut{color:#8d96bd;font-size:13px}
+  #psi-settings .psi-row{display:flex;gap:18px;align-items:flex-end}
+  #psi-settings .psi-chart{flex:1;display:flex;gap:6px;align-items:flex-end;height:72px}
+  #psi-settings .psi-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+  #psi-settings .psi-bar i{display:block;width:100%;max-width:26px;border-radius:5px 5px 3px 3px;background:linear-gradient(180deg,var(--c),var(--v));box-shadow:0 0 10px rgba(34,211,238,.25)}
+  #psi-settings .psi-bar i.z{background:rgba(148,163,255,.15);box-shadow:none}
+  #psi-settings .psi-bar span{font-size:11px;color:#8d96bd}
+  #psi-settings .psi-gow{display:flex;gap:12px;align-items:center;margin-top:14px}
+  #psi-settings .psi-gow img{width:150px;border-radius:4px;box-shadow:0 0 16px rgba(34,211,238,.2)}
+  #psi-settings .psi-comp{display:flex;gap:20px;align-items:center}
+  #psi-settings .psi-url{font-family:monospace;font-size:14px;color:var(--c);user-select:text}
+  #psi-settings .psi-pin{font-size:30px;font-weight:700;letter-spacing:.14em;color:#c4b5fd;font-family:monospace}
+  #psi-settings .psi-kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;margin-bottom:12px}
+  #psi-settings .psi-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  #psi-settings .psi-btns .DialogButton{width:auto;min-width:150px;padding:0 16px}
+  #psi-settings .psi-feat{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  #psi-settings .psi-feat:last-child{border-bottom:0}
+  #psi-settings .psi-feat b{display:block;color:#fff;font-weight:500}
+  #psi-settings .psi-sw{flex:none;position:relative;width:46px;height:24px;border-radius:99px;background:#3a4157;cursor:pointer;transition:background .2s}
+  #psi-settings .psi-sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#dfe3f0;transition:transform .2s}
+  #psi-settings .psi-sw.on{background:linear-gradient(135deg,var(--c),var(--v));box-shadow:0 0 12px rgba(34,211,238,.4)}
+  #psi-settings .psi-sw.on::after{transform:translateX(22px);background:#fff}
+  #psi-settings .psi-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  #psi-settings .psi-badges span{padding:4px 10px;border-radius:99px;background:rgba(139,92,246,.18);border:1px solid rgba(139,92,246,.4);font-size:12px}
+  #psi-settings .psi-err{color:#f87171}`;
+
+  /* ---------------- sekcia v Nastaveniach ---------------- */
+  const FEATURES = [
+    ["rounded", "Moderný vzhľad", "Zaoblené rohy v celom Steame, sklenená karta v obchode a plynulo miznúci obrázok hry v knižnici."],
+    ["collections", "Auto-kolekcie v knižnici", "Kolekcie „PSI · Gold“, „PSI · Natívne Linux“, „PSI · Online nepôjde (anti-cheat)“… Aktualizujú sa samy. Vypnutím sa odstránia."],
+    ["notify", "Upozornenia na zľavy", "Notifikácia v KDE, keď hra z wishlistu zľavní alebo je na historickom minime."],
+    ["buy_warning", "Varovanie pred kúpou", "Ak hra na Linuxe nepôjde (Borked alebo zablokovaný anti-cheat), obchod ťa upozorní pred pridaním do košíka."],
+    ["library", "ProtonDB v knižnici", "Pri každej hre v knižnici: medaila ProtonDB (Platinum, Gold…) alebo „Natívne“, ak má hra Linux verziu."],
+    ["store", "ProtonDB a zľavy v obchode", "Na stránke hry: medaila, odpočet konca zľavy, odhad zľavy a odporúčanie kúp/počkaj."],
+    ["community", "Vitrína „Môj týždeň“", "Na tvojom Steam profile: hodiny, hra týždňa a odznaky. Vidíš ju len ty."],
+    ["companion_lan", "Companion pre mobil", "Prístup z telefónu v domácej Wi-Fi. Na tomto PC beží Companion vždy."],
+  ];
+
+  function attachSettings(doc) {
+    const list = doc.querySelector('.PageListColumn [role="tablist"]');
+    if (!list || list.querySelector("#psi-tab")) return;
+    const tabs = [...list.querySelectorAll(':scope > [role="tab"]')];
+    if (tabs.length < 2) return;
+    const sel = tabs.find(t => t.getAttribute("aria-selected") === "true");
+    const plain = tabs.find(t => t !== sel) || tabs[0];
+    // trieda „vybraná záložka“ = rozdiel medzi vybranou a ostatnými (zisťuje sa pri otvorení)
+    let selCls = [];
+    const learnSel = () => {
+      if (selCls.length) return;
+      const native = [...list.querySelectorAll(':scope > [role="tab"]:not(#psi-tab)')];
+      const cur = native.find(t => t.getAttribute("aria-selected") === "true");
+      const other = native.find(t => t !== cur);
+      if (cur && other) selCls = [...cur.classList].filter(c => !other.classList.contains(c));
+    };
+
+    if (!doc.getElementById("psi-style")) {
+      const st = doc.createElement("style"); st.id = "psi-style"; st.textContent = CSS; doc.head.appendChild(st);
+    }
+    const sepSrc = list.querySelector('[role="separator"]');
+    if (sepSrc) { const sep = sepSrc.cloneNode(true); sep.id = "psi-sep"; list.appendChild(sep); }
+    const tab = plain.cloneNode(true);
+    tab.id = "psi-tab";
+    tab.setAttribute("aria-selected", "false");
+    tab.removeAttribute("aria-controls");
+    tab.querySelectorAll("[id]").forEach(e => { e.removeAttribute("id"); e.removeAttribute("aria-controls"); e.removeAttribute("aria-selected"); e.removeAttribute("role"); });
+    const [icon, label] = tab.children;
+    if (icon) icon.innerHTML = PSI_ICON;
+    if (label) label.textContent = "PSI";
+    list.appendChild(tab);
+
+    const state = {open: false, hidden: [], observer: null};
+    const content = () => doc.querySelector(".DialogContentTransition");
+
+    function open() {
+      const box = content();
+      if (!box) return;
+      learnSel();
+      state.open = true;
+      list.querySelectorAll('[role="tab"]').forEach(t => selCls.forEach(c => t.classList.remove(c)));
+      selCls.forEach(c => tab.classList.add(c));
+      tab.setAttribute("aria-selected", "true");
+      const hideOthers = () => [...box.children].forEach(ch => {
+        if (ch.id !== "psi-settings" && ch.style.display !== "none") { ch.style.display = "none"; state.hidden.push(ch); }
+      });
+      hideOthers();
+      let panel = doc.getElementById("psi-settings");
+      if (!panel) {
+        panel = doc.createElement("div");
+        panel.id = "psi-settings";
+        panel.className = "DialogContent _DialogLayout";
+        panel.setAttribute("role", "tabpanel");
+        panel.innerHTML = `<div class="DialogContent_InnerWidth"><div class="DialogHeader">PSI</div><div class="DialogBody" id="psi-body"><div class="psi-mut">Načítavam…</div></div></div>`;
+        box.appendChild(panel);
+      }
+      state.observer = new MutationObserver(() => state.open && hideOthers());
+      state.observer.observe(box, {childList: true});
+      render(doc);
+    }
+
+    function close() {
+      if (!state.open) return;
+      state.open = false;
+      state.observer && state.observer.disconnect();
+      const panel = doc.getElementById("psi-settings");
+      panel && panel.remove();
+      state.hidden.forEach(ch => { ch.style.display = ""; });
+      state.hidden = [];
+      selCls.forEach(c => tab.classList.remove(c));
+      tab.setAttribute("aria-selected", "false");
+      const cur = list.querySelector('[role="tab"][aria-selected="true"]:not(#psi-tab)');
+      cur && selCls.forEach(c => cur.classList.add(c));
+    }
+
+    tab.addEventListener("click", e => { e.stopPropagation(); open(); });
+    list.addEventListener("click", e => {
+      const t = e.target.closest('[role="tab"]');
+      if (t && t !== tab && !tab.contains(t)) close();
+    }, true);
+  }
+
+  async function render(doc) {
+    try { await renderInner(doc); }
+    catch (e) {
+      const body = doc.getElementById("psi-body");
+      if (body) body.innerHTML = `<div class="psi-card psi-err">Chyba PSI: ${esc(e && e.message)}</div>`;
+      console.error("PSI render", e);
+    }
+  }
+  window.__psiRenderSettings = render;
+  async function renderInner(doc) {
+    const body = doc.getElementById("psi-body");
+    if (!body) return;
+    let c, q, f, fonts;
+    try {
+      [c, q, f, fonts] = await Promise.all([call("companion_info"), call("companion_qr"), call("features"), call("fonts")]);
+    } catch (e) {
+      body.innerHTML = `<div class="psi-card psi-err">PSI služba neodpovedá: ${esc(e.message)}<br><span class="psi-mut">Skontroluj: systemctl --user status psi</span></div>`;
+      return;
+    }
+    body.innerHTML = `
+      <div class="psi-card">
+        <div class="psi-h">Funkcie</div>
+        ${FEATURES.map(([k, name, desc]) => `<div class="psi-feat"><div><b>${esc(name)}</b><span class="psi-mut">${esc(desc)}</span></div><div class="psi-sw ${f[k] ? "on" : ""}" data-f="${k}" role="switch" aria-checked="${!!f[k]}"></div></div>`).join("")}
+      </div>
+
+      <div class="psi-card">
+        <div class="psi-h">Písmo</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <select id="psi-font-sel" class="DialogDropDown" style="min-width:260px;height:34px;padding:0 10px;background:#32353c;color:#fff;border:0;border-radius:8px;font-size:14px">
+            <option value="">Predvolené (Motiva Sans)</option>
+            ${fonts.custom ? `<option value="${esc(fonts.current)}" selected>${esc(fonts.current)} (nahrané)</option>` : ""}
+            ${fonts.system.map(n => `<option value="${esc(n)}" ${!fonts.custom && n === fonts.current ? "selected" : ""} style="font-family:'${esc(n)}'">${esc(n)}</option>`).join("")}
+          </select>
+          <button type="button" class="DialogButton _DialogLayout Secondary Focusable" id="psi-font-up" style="width:auto;padding:0 16px">Nahrať písmo…</button>
+          <input type="file" id="psi-font-file" accept=".ttf,.otf,.woff,.woff2" style="display:none">
+        </div>
+        <div id="psi-font-msg" class="psi-mut" style="margin-top:8px">Platí pre celý Steam – knižnicu, Nastavenia aj obchod. Podporované .ttf, .otf, .woff, .woff2 (max 8 MB).</div>
+        <div style="margin-top:10px;font-size:18px;color:#fff" id="psi-font-prev">Príliš žltučký kôň úpel ďábelské ódy – 0123456789</div>
+      </div>
+
+      <div class="psi-card">
+        <div class="psi-h">PSI Companion · týždeň a wishlist na telefóne</div>
+        <div class="psi-comp">
+          ${q.matrix && q.matrix.length && f.companion_lan ? `<div>${qrSvg(q.matrix, 4)}</div>` : ""}
+          <div style="flex:1">
+            <div class="psi-kv">
+              <span class="psi-mut">Na tomto PC</span><span class="psi-url">${esc(c.local_url || "nebeží")}</span>
+              <span class="psi-mut">Mobil</span><span class="psi-url">${f.companion_lan ? esc(c.url || "žiadna sieť") : "vypnuté"}</span>
+            </div>
+            <div class="psi-mut">PIN</div>
+            <div class="psi-pin" id="psi-pin">${esc(c.pin.slice(0, 3))} ${esc(c.pin.slice(3))}</div>
+            <div class="psi-btns">
+              <button type="button" class="DialogButton _DialogLayout Primary Focusable" id="psi-open">Otvoriť na PC</button>
+              <button type="button" class="DialogButton _DialogLayout Secondary Focusable" id="psi-newpin">Nový PIN</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="psi-mut">PSI · lokálna služba na tomto PC · dáta v ~/.local/share/psi</div>`;
+
+    const fsel = body.querySelector("#psi-font-sel"), fmsg = body.querySelector("#psi-font-msg"), fprev = body.querySelector("#psi-font-prev");
+    fprev.style.fontFamily = fsel.value ? `"${fsel.value}"` : "";
+    fsel.addEventListener("change", async () => {
+      fprev.style.fontFamily = fsel.value ? `"${fsel.value}"` : "";
+      try { await call("set_font", {family: fsel.value}); FONT.key = null; await refreshFont(); scan(); fmsg.textContent = fsel.value ? `Písmo „${fsel.value}“ nastavené.` : "Vrátené predvolené písmo."; }
+      catch (e) { fmsg.textContent = "Chyba: " + e.message; }
+    });
+    const ffile = body.querySelector("#psi-font-file");
+    body.querySelector("#psi-font-up").addEventListener("click", () => ffile.click());
+    ffile.addEventListener("change", () => {
+      const file = ffile.files && ffile.files[0];
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) { fmsg.textContent = "Súbor je väčší ako 8 MB."; return; }
+      const rd = new (doc.defaultView.FileReader)();
+      rd.onload = async () => {
+        try {
+          const b64 = String(rd.result).split(",")[1] || "";
+          await call("upload_font", {name: file.name, data: b64});
+          FONT.key = null; await refreshFont(); scan();
+          render(doc);
+        } catch (e) { fmsg.textContent = "Chyba: " + e.message; }
+      };
+      rd.readAsDataURL(file);
+    });
+    body.querySelector("#psi-open").addEventListener("click", () => c.local_url && openUrl(c.local_url));
+    const np = body.querySelector("#psi-newpin");
+    np.addEventListener("click", async () => {
+      if (np.dataset.confirm !== "1") { np.dataset.confirm = "1"; np.textContent = "Naozaj? Odhlási telefóny"; setTimeout(() => { np.dataset.confirm = ""; np.textContent = "Nový PIN"; }, 4000); return; }
+      np.disabled = true;
+      try { await call("new_pin"); } catch (e) {}
+      render(doc);
+    });
+    body.querySelectorAll(".psi-sw").forEach(sw => sw.addEventListener("click", async () => {
+      const on = !sw.classList.contains("on");
+      sw.classList.toggle("on", on);
+      try { await call("set_feature", {name: sw.dataset.f, value: on}); } catch (e) { sw.classList.toggle("on", !on); }
+      if (sw.dataset.f === "collections") { await refreshFeatures(); on ? syncCollections(true) : removeCollections(); }
+      if (sw.dataset.f === "companion_lan") setTimeout(() => render(doc), 800);
+    }));
+  }
+
+  /* ---------------- karta ProtonDB (rovnaká v knižnici aj v obchode) ---------------- */
+  const TIER_BAND = {native: ["#008000", "#fff", "NATIVE"], platinum: ["#b4c7dc", "#14161b", "PLATINUM"], gold: ["#cfb53b", "#14161b", "GOLD"],
+    silver: ["#a6a6a6", "#14161b", "SILVER"], bronze: ["#cd7f32", "#14161b", "BRONZE"], borked: ["#e02424", "#fff", "BORKED"], pending: ["#444b5e", "#dfe3ee", "PENDING"]};
+  const DECK_INFO = {3: ["#59bf40", "M11 18.5l4.5 4.5 9-10", "Steam Deck: overené"], 2: ["#ffc82c", "M18 16v8M18 11.5v.5", "Steam Deck: hrateľné"],
+    1: ["#8b929a", "M11 25L25 11", "Steam Deck: nepodporované"], 0: ["#8b929a", "M14.5 14a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.2-1.5 2.3v.5M18 24.5v.5", "Steam Deck: neznáme"]};
+  function deckIcon(cat, s = 30) {
+    const [c, path, t] = DECK_INFO[cat] || DECK_INFO[0];
+    return `<svg width="${s}" height="${s}" viewBox="0 0 36 36"><title>${t}</title><circle cx="18" cy="18" r="15" fill="none" stroke="${c}" stroke-width="2.6"/><path d="${path}" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function tuxIcon(native, s = 30) {
+    const c = native ? "#22c55e" : "#5b6170";
+    return `<svg width="${s}" height="${s}" viewBox="0 0 36 36"><title>${native ? "Natívna Linux verzia" : "Bez natívnej Linux verzie (beží cez Proton)"}</title>
+      <rect x="1.5" y="1.5" width="33" height="33" rx="7" fill="${native ? "rgba(34,197,94,.15)" : "none"}" stroke="${c}" stroke-width="2.4"/>
+      <ellipse cx="18" cy="20" rx="7.5" ry="10" fill="${c}"/><ellipse cx="18" cy="22.5" rx="4.6" ry="6.6" fill="#f3f4f6"/>
+      <circle cx="15.6" cy="13.5" r="1.3" fill="#111"/><circle cx="20.4" cy="13.5" r="1.3" fill="#111"/><path d="M16 16.5h4l-2 2.2z" fill="#f59e0b"/></svg>`;
+  }
+  function protonCard(info) {
+    const p = info.protondb || {}, tier = info.native ? "native" : (p.tier || "pending");
+    const [bg, fg, label] = TIER_BAND[tier] || TIER_BAND.pending;
+    const pt = TIERS[p.tier] || TIERS.pending;
+    const meta = [p.reports ? `${p.reports} hlásení` : "zatiaľ bez hlásení",
+      p.trending && p.trending !== p.tier && TIERS[p.trending] ? `trend ${TIERS[p.trending].label}` : ""].filter(Boolean).join(" · ");
+    return `<div class="psi-pcard" style="width:270px;flex:none;border-radius:6px;overflow:hidden;background:#1e222b;border:1px solid rgba(255,255,255,.08);font-family:'Motiva Sans',Arial,sans-serif">
+      <div style="background:${bg};color:${fg};text-align:center;font-size:19px;font-weight:600;letter-spacing:.08em;padding:9px 6px">${label}</div>
+      <div style="display:flex;justify-content:center;align-items:center;gap:18px;padding:12px 10px 8px">
+        <span title="ProtonDB: ${pt.label}">${medal(p.tier || "pending", 26)}</span>${deckIcon(info.deck)}${tuxIcon(info.native)}
+      </div>
+      <div style="text-align:center;color:#8b929a;font-size:12px;padding:0 10px 11px">${esc(meta)} · <span class="psi-pdb" style="color:#22d3ee;cursor:pointer">ProtonDB ↗</span></div>
+    </div>`;
+  }
+
+  /* ---------------- vysvetlenie: prečo Gold, anti-cheat, Deck ---------------- */
+  const TIER_WHY = {
+    native: "Hra má natívnu Linux verziu – Proton netreba.",
+    platinum: "Beží perfektne hneď po inštalácii, nič netreba nastavovať.",
+    gold: "Beží perfektne, ale niekedy po menšej úprave (iná verzia Protonu alebo spúšťací parameter).",
+    silver: "Hrateľná, ale s menšími chybami (grafika, zvuk, občasný pád).",
+    bronze: "Spustí sa, ale má vážne problémy – hranie môže byť nepríjemné.",
+    borked: "Nespustí sa alebo je nehrateľná.",
+    pending: "Zatiaľ málo hlásení na spoľahlivé hodnotenie.",
+  };
+  const CONF = {strong: "vysoká", good: "dobrá", moderate: "stredná", low: "nízka", inadequate: "nedostatočná"};
+  const AC = {
+    Supported: ["ok", "Anti-cheat na Linuxe funguje – online hranie je v poriadku."],
+    Running: ["warn", "Anti-cheat beží, ale vývojár Linux oficiálne nepodporuje – môže sa to kedykoľvek zmeniť."],
+    Planned: ["warn", "Podpora Linuxu sa plánuje – online zatiaľ nemusí fungovať."],
+    Broken: ["bad", "Anti-cheat na Linuxe nefunguje – do online hier ťa nepustí alebo vyhodí."],
+    Denied: ["bad", "Vývojár Linux zablokoval – do online hier ťa nepustí (offline režim, ak ho hra má, ide)."],
+  };
+  const DECK_TXT = {3: ["ok", "Steam Deck: overené"], 2: ["warn", "Steam Deck: hrateľné (drobné obmedzenia)"], 1: ["bad", "Steam Deck: nepodporované"], 0: ["info", "Steam Deck: zatiaľ nehodnotené"]};
+  const ICO = {
+    ok: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="#a4d007" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    warn: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2l6.5 12h-13z" fill="none" stroke="#e5a83a" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 6.5v3.5M8 12v.3" stroke="#e5a83a" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    bad: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="#d94126" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    info: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="#8f98a0" stroke-width="1.6"/><path d="M8 7.2v4M8 4.8v.3" stroke="#8f98a0" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  };
+  /* ---------------- výkon na tvojom PC (odhad FPS) ---------------- */
+  function perfHtml(p) {
+    if (!p) return "";
+    const pc = p.pc || {}, req = p.req || {}, mn = req.minimum || {}, rc = req.recommended || {};
+    const col = {great: "#59bf40", good: "#a4d007", ok: "#e5a83a", low: "#e5a83a", bad: "#d94126"}[p.level] || "#8f98a0";
+    const cmp = (mine, need) => mine == null || need == null ? "info" : mine >= need ? "ok" : "bad";
+    const ref = rc.gpu_score ? rc : mn;
+    const fps = n => n == null ? "?" : n >= 144 ? "144+" : String(n);
+    const row = (lvl, label, mine, need) => `<div style="display:flex;gap:10px;align-items:flex-start;padding:4px 0;line-height:1.4">
+      <span style="flex:none;margin-top:2px">${ICO[lvl]}</span><span style="min-width:74px;color:#8f98a0">${label}</span>
+      <span><span style="color:#fff">${esc(mine)}</span>${need ? `<span style="color:#8f98a0"> · ${ref === rc ? "odporúčané" : "minimum"}: ${esc(need)}</span>` : ""}</span></div>`;
+    const head = p.fps_high ? `<div style="display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+        <div><div style="font-size:34px;line-height:1;color:${col};font-weight:300">≈ ${fps(p.fps_high)} <span style="font-size:16px">FPS</span></div>
+          <div style="font-size:12.5px;color:#8f98a0;margin-top:4px">${esc(p.preset || "")} detaily · 1080p</div></div>
+        ${p.fps_low ? `<div><div style="font-size:20px;line-height:1;color:#dcdedf">≈ ${fps(p.fps_low)} FPS</div><div style="font-size:12.5px;color:#8f98a0;margin-top:4px">nízke detaily</div></div>` : ""}
+      </div>` : `<div style="color:#8f98a0;margin-bottom:8px">Odhad nie je k dispozícii – hra neuvádza porovnateľné požiadavky.</div>`;
+    return head
+      + row(cmp(pc.gpu_score, ref.gpu_score), "Grafika", pc.gpu || "?", ref.gpu || "")
+      + row(cmp(pc.cpu_score, ref.cpu_score), "Procesor", pc.cpu || "?", ref.cpu || "")
+      + row(cmp(pc.ram, ref.ram), "RAM", pc.ram ? `${pc.ram} GB` : "?", ref.ram ? `${ref.ram} GB` : "")
+      + (p.notes || []).map(n => `<div style="color:#8f98a0;font-size:12px;padding-top:4px">ⓘ ${esc(n)}</div>`).join("")
+      + `<div style="color:#56707f;font-size:11px;margin-top:8px">Odhad podľa požiadaviek hry a tvojho hardvéru – skutočné FPS sa môžu líšiť.</div>`;
+  }
+
+  function linuxRows(info) {
+    const p = info.protondb || {}, tier = info.native ? "native" : (p.tier || "pending");
+    const rows = [];
+    const tl = (TIERS[tier] || TIERS.pending).label;
+    rows.push([tier === "borked" ? "bad" : ["bronze", "silver", "pending"].includes(tier) ? "warn" : "ok", `<b style="color:#fff;font-weight:600">${tl}</b> – ${TIER_WHY[tier] || ""}`]);
+    if (!info.native && p.reports) {
+      const extra = [`${p.reports} hlásení`, CONF[p.confidence] ? `istota ${CONF[p.confidence]}` : "",
+        p.trending && p.trending !== p.tier && TIERS[p.trending] ? `nové hlásenia: ${TIERS[p.trending].label}` : "",
+        p.best && p.best !== p.tier && TIERS[p.best] ? `najlepšie: ${TIERS[p.best].label}` : ""].filter(Boolean).join(" · ");
+      rows.push(["info", `ProtonDB: ${esc(extra)}`]);
+    }
+    const ac = info.anticheat;
+    if (ac && ac.anticheats && ac.anticheats.length) {
+      const [lvl, txt] = AC[ac.status] || ["info", `Stav: ${esc(ac.status)}`];
+      rows.push([lvl, `<b style="color:#fff;font-weight:600">${esc(ac.anticheats.join(", "))}</b> – ${txt}`]);
+      (ac.notes || []).forEach(n => rows.push(["info", `<span style="color:#8f98a0">${esc(n)}</span>`]));
+    } else {
+      rows.push(["ok", "Bez známeho problémového anti-cheatu – online by malo ísť."]);
+    }
+    const [dl, dt] = DECK_TXT[info.deck] || DECK_TXT[0];
+    rows.push([dl, dt]);
+    rows.push([info.native ? "ok" : "info", info.native ? "Natívna Linux verzia" : "Beží cez Proton (Steam Play)"]);
+    return rows.map(([l, h]) => `<div style="display:flex;gap:10px;align-items:flex-start;padding:5px 0;line-height:1.45"><span style="flex:none;margin-top:2px">${ICO[l]}</span><span>${h}</span></div>`).join("");
+  }
+  /* ---------------- knižnica: ProtonDB pri hre + popis ---------------- */
+  const libCache = new Map();
+  let libOn = true, libOnT = 0, libBusy = false;
+  const DECK = {3: "overené", 2: "hrateľné", 1: "nepodporované"};
+  const STAT_LABEL = /^(Play ?Time|Last Played|Space Required|Achievements|Čas hrania|Naposledy hrané|Potrebné miesto)$/i;
+
+  // Všetky kontajnery štatistík (Steam má aj skryté kópie a lepkavú hlavičku)
+  function allStats(doc) {
+    const known = [...doc.querySelectorAll("._1mDAVT4sTzFRwJtlKCw2Ws")];   // Steam build 2026-11
+    if (known.length) return known;
+    const out = new Set();
+    for (const el of doc.querySelectorAll(".tool-tip-source div")) {
+      if (!el.children.length && STAT_LABEL.test(el.textContent.trim())) {
+        const src = el.closest(".tool-tip-source");
+        src && src.parentElement && out.add(src.parentElement);
+      }
+    }
+    return [...out];
+  }
+
+  function statItem(stats, appid, info) {
+    const p = info.protondb || {}, tier = info.native ? "native" : (p.tier || "pending"), t = TIERS[tier] || TIERS.pending;
+    const sample = [...stats.querySelectorAll(":scope > .tool-tip-source")].find(e => !e.querySelector("svg") && !e.classList.contains("psi-lib")) || stats.firstElementChild;
+    const item = sample.cloneNode(true);
+    item.classList.add("psi-lib");
+    item.removeAttribute("id");
+    item.dataset.app = String(appid);
+    const leaves = [...item.querySelectorAll("div")].filter(e => !e.children.length);
+    if (leaves[0]) leaves[0].textContent = info.native ? "Linux" : "ProtonDB";
+    const value = leaves[leaves.length - 1];
+    if (value) value.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px">${medal(tier, 14).replace(/<title>.*?<\/title>/, "")}<span style="color:${t.c1};font-weight:600">${info.native ? "Natívne" : t.label}</span></span>`;
+    item.title = [info.native ? "Natívna Linux verzia" : `ProtonDB: ${t.label}`, p.reports ? `${p.reports} hlásení` : "",
+      DECK[info.deck] ? `Steam Deck: ${DECK[info.deck]}` : ""].filter(Boolean).join(" · ") + " – klikni pre ProtonDB";
+    item.style.cursor = "pointer";
+    item.addEventListener("click", e => { e.stopPropagation(); openUrl(`https://www.protondb.com/app/${appid}`); });
+    return item;
+  }
+
+  function aboutBlock(doc, appid, info) {
+    const box = doc.createElement("div");
+    box.className = "psi-libcard";
+    box.dataset.app = String(appid);
+    box.style.cssText = "margin:4px 0 22px;padding:14px 20px;border-radius:6px;" +
+      "background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.06)";
+    const who = [info.developers && info.developers.length ? `Vývojár: ${info.developers.slice(0, 2).join(", ")}` : "",
+      info.publishers && info.publishers.length ? `Vydavateľ: ${info.publishers.slice(0, 2).join(", ")}` : ""].filter(Boolean).join(" · ");
+    let open = false;
+    try { open = doc.defaultView.localStorage.getItem("psi-about-open") === "1"; } catch (e) {}
+    box.innerHTML = `
+      <div class="psi-about-head" style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
+        <div style="font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#dcdedf;font-weight:500">O hre</div>
+        <svg class="psi-chev" width="14" height="14" viewBox="0 0 14 14" style="transition:transform .2s;transform:rotate(${open ? 90 : 0}deg)"><path d="M5 3l4 4-4 4" fill="none" stroke="#dcdedf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="psi-about-body" style="display:${open ? "flex" : "none"};gap:24px;align-items:flex-start;margin-top:12px">
+      <div style="flex:1;min-width:0">
+        <div style="color:#c6d4df;font-size:14px;line-height:1.55">${esc(info.desc || "Popis hry nie je k dispozícii.")}</div>
+        ${who ? `<div style="color:#8b929a;font-size:12.5px;margin-top:12px">${esc(who)}</div>` : ""}
+        <div style="font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#dcdedf;margin:20px 0 6px;font-weight:500">Hrať na Linuxe</div>
+        <div style="color:#c6d4df;font-size:14px">${linuxRows(info)}</div>
+        <div style="font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#dcdedf;margin:20px 0 8px;font-weight:500">Výkon na tvojom PC</div>
+        <div style="color:#c6d4df;font-size:14px" class="psi-perf">${info.perf ? perfHtml(info.perf) : '<span style="color:#8f98a0">Počítam odhad…</span>'}</div>
+        <div style="color:#5b6170;font-size:11px;margin-top:10px">Údaje: ProtonDB, AreWeAntiCheatYet, Steam · PSI</div>
+      </div>
+      ${protonCard(info)}
+      </div>`;
+    box.querySelector(".psi-about-head").addEventListener("click", e => {
+      e.stopPropagation();
+      const body = box.querySelector(".psi-about-body"), now = body.style.display === "none";
+      body.style.display = now ? "flex" : "none";
+      box.querySelector(".psi-chev").style.transform = `rotate(${now ? 90 : 0}deg)`;
+      try { doc.defaultView.localStorage.setItem("psi-about-open", now ? "1" : "0"); } catch (err) {}
+    });
+    box.querySelector(".psi-pdb").addEventListener("click", e => { e.stopPropagation(); openUrl(`https://www.protondb.com/app/${appid}`); });
+    return box;
+  }
+
+  async function libraryTick() {
+    if (libBusy) return;
+    const loc = window.MainWindowBrowserManager && MainWindowBrowserManager.m_lastLocation;
+    const m = loc && /^\/library\/app\/(\d+)/.exec(loc.pathname || "");
+    const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
+    const doc = pop && pop.m_popup && pop.m_popup.document;
+    if (!m || !doc) return;
+    const appid = +m[1];
+    const statsList = allStats(doc).filter(st => st.offsetParent);
+    const todo = statsList.filter(st => !st.querySelector(`:scope > .psi-lib[data-app="${appid}"]`));
+    const main = statsList[statsList.length - 1];
+    if (!todo.length && main && main.closest("[class]") && doc.querySelector(`.psi-libcard[data-app="${appid}"]`)?.offsetParent) return;
+    libBusy = true;
+    try {
+      if (!FEAT.library) { doc.querySelectorAll(".psi-lib, .psi-libcard").forEach(e => e.remove()); return; }
+      let info = libCache.get(appid);
+      if (!info) { info = await call("linux", {appid}); libCache.set(appid, info); }
+      if (!info.perf) { try { info.perf = await call("perf", {appid}); } catch (e) {} }
+      const now = /^\/library\/app\/(\d+)/.exec(MainWindowBrowserManager.m_lastLocation.pathname || "");
+      if (!now || +now[1] !== appid) return;               // medzitým prepnutá hra
+      for (const st of allStats(doc).filter(s => s.offsetParent)) {
+        st.querySelectorAll(":scope > .psi-lib").forEach(e => e.remove());
+        st.prepend(statItem(st, appid, info));
+      }
+      // blok „O hre“ – nad stĺpcami Aktivita / Priatelia (posledný súrodenec sekcie s tlačidlom Play)
+      const mainStats = allStats(doc).filter(s => s.offsetParent).pop();
+      let sec = mainStats;
+      while (sec && sec.parentElement && sec.parentElement.children.length < 5) sec = sec.parentElement;
+      const host = sec && sec.parentElement;
+      if (host) {
+        host.querySelectorAll(":scope > .psi-libcard").forEach(e => e.remove());
+        const block = aboutBlock(doc, appid, info);
+        const columns = host.lastElementChild;
+        // zarovnanie s riadkom tlačidla Play
+        let row = mainStats; for (let i = 0; i < 3 && row.parentElement; i++) row = row.parentElement;
+        const r = row.getBoundingClientRect(), hr = host.getBoundingClientRect();
+        if (r.width > 200) { block.style.marginLeft = Math.max(0, r.left - hr.left) + "px"; block.style.marginRight = Math.max(0, hr.right - r.right) + "px"; }
+        host.insertBefore(block, columns);
+      }
+    } catch (e) { /* skúsime pri ďalšom tiku */ }
+    finally { libBusy = false; }
+  }
+
+
+  /* ---------------- zaoblené rohy v klientovi ---------------- */
+  const ROUND_CSS = `
+  .DialogButton,.DialogDropDown,._DialogInputContainer,.DialogInput,.DialogTextInputBase,.DialogInputLabelGroup input{border-radius:8px!important}
+  .ModalPosition_Content,.GenericConfirmDialog,.DialogContent_InnerWidth .DialogBody > .Panel{border-radius:12px}
+  .ModalPosition_Content{overflow:hidden}
+  img.avatar,.avatarHolder,.avatarFrame img{border-radius:8px}
+  ._1FnJ6dPuknQFQ2RTpKTI16{border-radius:10px;overflow:hidden}
+  ._2r4TK4BAuU-J4FuF_O7v_5{border-radius:10px;overflow:hidden}
+  ._3qDWQGB0rtwM3qpXTb11Q-{border-radius:8px}
+  .psi-libcard{border-radius:12px!important}.psi-pcard{border-radius:10px!important}
+  /* menu sú nepriehľadné okná – okno nezaobľujeme (čierne rohy), len zvýraznenie položiek */
+  .ContextMenuPopupBody .contextMenuItem{border-radius:6px;margin:0 4px}
+  .PageListColumn [role="tab"]{border-radius:8px}
+  ._3pSPluBgf0NeR1kkCLWMhR,._2WgQEFvIzJw_SHNGbjtRFU,._12vo5L1hsNGdao6_ssuirS,.DialogInput_Wrapper{border-radius:8px;overflow:hidden}
+  ._2-O4ZG0KrnSrzISHBKctFQ{border-radius:6px}
+  ._2Szzh5sKyGgnLUR870zbDE{border-radius:8px!important}
+  ._3yD46y5pd3zOGR7CzKs0mC{border-radius:8px!important;overflow:hidden}
+  img[src*="library_hero."]:not([src*="blur"]){-webkit-mask-image:linear-gradient(to bottom,#000 40%,rgba(0,0,0,.6) 62%,transparent 84%);mask-image:linear-gradient(to bottom,#000 40%,rgba(0,0,0,.6) 62%,transparent 84%)}
+  #psi-settings .psi-card{border-radius:12px}
+  `;
+  const FEAT = {rounded: true, library: true};
+  async function refreshFeatures() { try { Object.assign(FEAT, await call("features")); } catch (e) {} try { await refreshFont(); } catch (e) {} }
+  function applyRounded(doc) {
+    const ex = doc.getElementById("psi-round");
+    if (FEAT.rounded && !ex) { const st = doc.createElement("style"); st.id = "psi-round"; st.textContent = ROUND_CSS; (doc.head || doc.documentElement).appendChild(st); }
+    else if (!FEAT.rounded && ex) ex.remove();
+  }
+
+
+  /* ---------------- auto-kolekcie v knižnici ---------------- */
+  // PSI mení LEN kolekcie s predponou „PSI · “ – tvoje vlastné kolekcie nechá tak.
+  const COLS = [
+    ["PSI · Natívne Linux", d => d.native],
+    ["PSI · Platinum", d => !d.native && d.tier === "platinum"],
+    ["PSI · Gold", d => !d.native && d.tier === "gold"],
+    ["PSI · Silver", d => !d.native && d.tier === "silver"],
+    ["PSI · Bronze", d => !d.native && d.tier === "bronze"],
+    ["PSI · Nefunguje (Borked)", d => !d.native && d.tier === "borked"],
+    ["PSI · Online nepôjde (anti-cheat)", d => d.ac === "Denied" || d.ac === "Broken"],
+    ["PSI · Steam Deck overené", d => d.deck === 3],
+  ];
+  let colBusy = false, colLast = 0;
+  function findCol(name) {
+    return collectionStore.userCollections.find(c => c.displayName === name) || null;
+  }
+  async function syncCollections(force = false) {
+    if (colBusy || !window.collectionStore || !window.appStore) return;
+    if (!FEAT.collections) return;
+    if (!force && Date.now() - colLast < 6 * 3600e3) return;
+    colBusy = true;
+    try {
+      const games = (collectionStore.GetCollection("type-games") || {}).allApps || [];
+      if (!games.length) return;
+      const data = await call("tiers", {appids: games.map(a => a.appid)});
+      for (const [name, test] of COLS) {
+        const want = games.filter(a => data[a.appid] && test(data[a.appid]));
+        let c = findCol(name);
+        if (!want.length) { if (c && c.bIsDeletable) await c.Delete(); continue; }
+        if (!c) { c = collectionStore.NewUnsavedCollection(name, undefined, want); await c.Save(); continue; }
+        const wantIds = new Set(want.map(a => a.appid)), have = new Set(c.allApps.map(a => a.appid));
+        const add = want.filter(a => !have.has(a.appid)), rem = c.allApps.filter(a => !wantIds.has(a.appid));
+        const dd = c.AsDragDropCollection ? c.AsDragDropCollection() : c;
+        if (add.length) dd.AddApps(add);
+        if (rem.length) dd.RemoveApps(rem);
+        if (add.length || rem.length) await c.Save();
+      }
+      colLast = Date.now();
+    } catch (e) { console.warn("PSI kolekcie:", e); }
+    finally { colBusy = false; }
+  }
+  async function removeCollections() {
+    for (const [name] of COLS) { const c = findCol(name); if (c && c.bIsDeletable) { try { await c.Delete(); } catch (e) {} } }
+  }
+  window.__psiSyncCollections = syncCollections;
+
+
+  /* ---------------- automatické zaoblenie všetkého viditeľného ---------------- */
+  // Každý prvok s pozadím, rámikom, tieňom alebo obrázok/tlačidlo dostane zaoblené rohy.
+  // Preskočí: SVG, prvky cez celú šírku okna, malé ikonky a prvky, ktoré už zaoblené sú.
+  function psiAutoRound(doc, isOn) {
+    const win = doc.defaultView;
+    if (!win || win.__psiAutoRound) return;
+    win.__psiAutoRound = true;
+    const done = new WeakSet();
+    const MEDIA = /^(IMG|VIDEO|INPUT|BUTTON|SELECT|TEXTAREA|CANVAS)$/;
+    let timer = null;
+    const pass = () => {
+      timer = null;
+      if (!isOn()) return;
+      const vw = win.innerWidth || 1;
+      for (const e of doc.querySelectorAll("div,a,button,img,video,input,select,textarea,section,li,form,canvas,span,label,ul,table,h1,h2,h3")) {
+        if (done.has(e)) continue;
+        const r = e.getBoundingClientRect();
+        if (!r.width || !r.height) continue;              // skryté – skúsime neskôr
+        done.add(e);
+        if (r.width < 14 || r.height < 12 || r.width > vw * 0.97 || e.closest("svg")) continue;
+        if (e.closest(".ContextMenuPopupBody") && r.width > vw * 0.9) continue;
+        const cs = win.getComputedStyle(e);
+        if (cs.borderTopLeftRadius !== "0px" || (cs.display === "inline" && e.tagName === "SPAN")) continue;
+        const bg = cs.backgroundColor;
+        const visible = MEDIA.test(e.tagName) || (bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") ||
+          cs.backgroundImage !== "none" || parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0 || cs.boxShadow !== "none";
+        if (!visible) continue;
+        const rad = Math.min(12, Math.max(4, Math.round(Math.min(r.width, r.height) / 4)));
+        e.style.setProperty("border-radius", rad + "px");
+      }
+    };
+    const schedule = () => { if (!timer) timer = win.setTimeout(pass, 450); };
+    new win.MutationObserver(schedule).observe(doc.documentElement, {childList: true, subtree: true});
+    win.addEventListener("scroll", schedule, {passive: true});
+    schedule();
+  }
+
+  /* ---------------- vlastné písmo ---------------- */
+  const FONT = {key: null, css: ""};
+  async function refreshFont() {
+    try {
+      const f = await call("fonts");
+      const key = (f.current || "") + "|" + (f.custom || "");
+      if (key === FONT.key) return;
+      FONT.key = key;
+      if (!f.current) { FONT.css = ""; return; }
+      const c = await call("font_css");
+      FONT.css = `${c.face}
+      *:not(svg):not(svg *):not(code):not(pre):not(kbd){font-family:"${c.family}","Motiva Sans",Arial,sans-serif!important}`;
+    } catch (e) {}
+  }
+  function applyFont(doc) {
+    let st = doc.getElementById("psi-font");
+    if (!FONT.css) { st && st.remove(); return; }
+    if (!st) { st = doc.createElement("style"); st.id = "psi-font"; (doc.head || doc.documentElement).appendChild(st); }
+    if (st.textContent !== FONT.css) st.textContent = FONT.css;
+  }
+
+  /* ---------------- hľadanie okna Nastavení ---------------- */
+  function scan() {
+    try {
+      const pm = window.g_PopupManager;
+      if (!pm || !pm.m_mapPopups) return;
+      for (const p of pm.m_mapPopups.values()) {
+        const doc = p.m_popup && p.m_popup.document;
+        if (doc) { applyRounded(doc); applyFont(doc); psiAutoRound(doc, () => FEAT.rounded); }
+        if (doc && doc.querySelector('.PageListColumn [role="tablist"] [id*="/settings/"]')) attachSettings(doc);
+      }
+    } catch (e) { /* Steam UI sa mení – skúsime znova */ }
+  }
+  let active = true;
+  try { window.g_PopupManager && window.g_PopupManager.AddPopupCreatedCallback && window.g_PopupManager.AddPopupCreatedCallback(() => active && setTimeout(scan, 300)); } catch (e) {}
+  refreshFeatures().then(() => { scan(); setTimeout(() => syncCollections(true), 5000); });
+  const colTimer = setInterval(() => syncCollections(), 15 * 60e3);
+  const featTimer = setInterval(refreshFeatures, 4000);
+  const timer = setInterval(scan, 1500);
+  const libTimer = setInterval(libraryTick, 700);
+  window.__psiCleanup = () => {
+    active = false;
+    clearInterval(timer);
+    clearInterval(featTimer);
+    clearInterval(colTimer);
+    clearInterval(libTimer);
+    for (const p of (window.g_PopupManager && g_PopupManager.m_mapPopups ? g_PopupManager.m_mapPopups.values() : [])) {
+      const doc = p.m_popup && p.m_popup.document;
+      if (!doc) continue;
+      const panel = doc.getElementById("psi-settings");
+      if (panel) { [...panel.parentElement.children].forEach(ch => { ch.style.display = ""; }); panel.remove(); }
+      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
+      doc.querySelectorAll(".psi-lib, .psi-libcard").forEach(e => e.remove());
+    }
+  };
+  // prvá verzia nemala __psiCleanup – jej prvky odstránime tu, nová verzia ich hneď nahradí
+  for (const p of (window.g_PopupManager && g_PopupManager.m_mapPopups ? g_PopupManager.m_mapPopups.values() : [])) {
+    const doc = p.m_popup && p.m_popup.document;
+    if (!doc) continue;
+    const panel = doc.getElementById("psi-settings");
+    if (panel) { [...panel.parentElement.children].forEach(ch => { ch.style.display = ""; }); panel.remove(); }
+    ["psi-tab", "psi-sep", "psi-style", "psi-lib"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
+  }
+  scan();
+})();
