@@ -270,6 +270,33 @@ class Psi:
             self.companion.wake()
         return f
 
+    def disk(self, appid: int = 0) -> dict:
+        """Voľné miesto na disku knižnice Steamu, kde je (bude) hra nainštalovaná."""
+        root = core.steam_root()
+        paths = []
+        if root:
+            try:
+                data = core.parse_vdf((root / "steamapps/libraryfolders.vdf").read_text(errors="replace"))
+                lf = core._ci(data, "libraryfolders") or {}
+                for v in lf.values():
+                    if isinstance(v, dict) and core._ci(v, "path"):
+                        paths.append(Path(core._ci(v, "path")))
+            except OSError:
+                pass
+            if not paths:
+                paths = [root]
+        best = None
+        for pth in paths:
+            if appid and (pth / f"steamapps/appmanifest_{int(appid)}.acf").exists():
+                best = pth
+                break
+        best = best or (paths[0] if paths else Path.home())
+        try:
+            u = shutil.disk_usage(best)
+        except OSError:
+            return {"path": str(best), "free": None, "total": None}
+        return {"path": str(best), "free": u.free, "total": u.total}
+
     def theme(self) -> dict:
         return core.theme()
 
@@ -297,7 +324,7 @@ class Psi:
 BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
-               "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme"},
+               "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme", "disk"},
     "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme"},
 }
 
@@ -411,7 +438,7 @@ class Injector(threading.Thread):
             if method not in BRIDGE_METHODS[kind]:
                 raise PermissionError(f"metóda {method!r} nie je povolená")
             fn = getattr(self.psi, method)
-            if method in ("deal", "protondb", "game", "linux", "perf"):
+            if method in ("deal", "protondb", "game", "linux", "perf", "disk"):
                 result = fn(int(args["appid"]))
             elif method == "search":
                 result = fn(str(args.get("q", "")))

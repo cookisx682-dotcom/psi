@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.25";
+  const VERSION = "1.29";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -644,7 +644,7 @@
   ._2-O4ZG0KrnSrzISHBKctFQ{border-radius:6px}
   ._2Szzh5sKyGgnLUR870zbDE{border-radius:8px!important}
   ._3yD46y5pd3zOGR7CzKs0mC{border-radius:8px!important;overflow:hidden}
-  img[src*="library_hero."]:not([src*="blur"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 6%,#000 16%,#000 24%,rgba(0,0,0,.45) 48%,transparent 74%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 6%,#000 16%,#000 24%,rgba(0,0,0,.45) 48%,transparent 74%)!important}
+  img.HNbe3eZf6H7dtJ042x1vM[src*="library_hero."]:not([src*="blur"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 6%,#000 16%,#000 24%,rgba(0,0,0,.45) 48%,transparent 74%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 6%,#000 16%,#000 24%,rgba(0,0,0,.45) 48%,transparent 74%)!important}
   img[src*="library_hero_blur"]:not([class*="_3_IUV"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 8%,rgba(0,0,0,.3) 35%,transparent 62%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 8%,rgba(0,0,0,.3) 35%,transparent 62%)!important}
   /* bodka vo farbe témy pri vybranej / označenej hre v zozname */
   ._2-O4ZG0KrnSrzISHBKctFQ{position:relative}
@@ -861,6 +861,63 @@
     }
   }
 
+
+  /* ---------------- Stiahnuté: hlavička, dúhový pruh, čas / GB / voľné miesto ---------------- */
+  const DL_CSS = `
+  ._1VNuYHM6BPBOJspC6zPf5r:has(._2sCvZTD6ZTZz3p9_ekH_gI){background:transparent!important;height:auto!important;min-height:0!important;overflow:visible!important;padding:12px 16px 6px!important}
+  ._2sCvZTD6ZTZz3p9_ekH_gI{position:relative!important;width:100%!important;box-sizing:border-box;border-radius:var(--psi-radius,12px)!important;
+    overflow:hidden!important;background:var(--psi-panel,rgba(18,28,44,.62))!important;border:1px solid rgba(255,255,255,.04)}
+  ._3WauYi7bNDSGIogMLPVYES{-webkit-mask-image:linear-gradient(to right,#000 35%,transparent 92%),linear-gradient(to bottom,transparent 0%,#000 22%,#000 62%,transparent 100%)!important;
+    -webkit-mask-composite:source-in!important;mask-image:linear-gradient(to right,#000 35%,transparent 92%),linear-gradient(to bottom,transparent 0%,#000 22%,#000 62%,transparent 100%)!important;mask-composite:intersect!important}
+  ._25YVDTaClw6Y2COPsU0UaV{height:7px!important}
+  #psi-dlinfo{display:grid;grid-template-columns:auto auto;gap:3px 16px;margin-top:8px;font-size:11.5px;color:#8b929a;white-space:nowrap}
+  #psi-dlinfo b{color:#dcdedf;font-weight:600}`;
+  const fmtGB = b => b == null ? "?" : b >= 1e12 ? (b / 1e12).toFixed(2) + " TB" : b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : (b / 1e6).toFixed(0) + " MB";
+  const fmtETA = s => s == null || s < 0 ? "?" : s < 60 ? "< 1 min" : s < 3600 ? Math.round(s / 60) + " min" : Math.floor(s / 3600) + " h " + Math.round((s % 3600) / 60) + " min";
+  const diskCache = {};
+  window.__psiDownloadsExtras = () => downloadsExtras();
+  function downloadsExtras() {
+    if (!FEAT.rounded) return;
+    const loc = window.MainWindowBrowserManager && MainWindowBrowserManager.m_lastLocation;
+    if (!loc || !/^\/library\/downloads/.test(loc.pathname || "")) return;
+    const doc = g_PopupManager.m_mapPopups.get("SP Desktop_uid0").m_popup.document;
+    if (!doc.getElementById("psi-dl")) { const st = doc.createElement("style"); st.id = "psi-dl"; st.textContent = DL_CSS; doc.head.appendChild(st); }
+    const track = doc.querySelector("._25YVDTaClw6Y2COPsU0UaV");
+    const fill = track && (doc.querySelector("._1FnTqlsi2_-TJf1d5apoS6") || track.firstElementChild);
+    if (fill && !fill.classList.contains("psi-rainbow")) { fill.classList.add("psi-rainbow"); track.classList.add("psi-rainbow-track"); }
+    if (!track) return;
+    // aktuálne sťahovaná položka
+    const ds = window.downloadsStore;
+    let lists = ds && ds.m_DownloadItems;
+    lists = lists && typeof lists.values === "function" ? [...lists.values()] : lists ? Object.values(lists) : [];
+    const items = lists.flat ? lists.flat() : [].concat(...lists);
+    const it = items.find(x => x && x.active) || items.find(x => x && x.queue_index === 0);
+    let info = doc.getElementById("psi-dlinfo");
+    if (!it) { info && info.remove(); return; }
+    const ut = (it.update_type_info || []).find(u => u.has_update) || {};
+    const pr = ut.progress || [];
+    const dl = pr[2] && pr[2].bytes_total ? pr[2] : pr.reduce((a, b) => (b.bytes_total > (a ? a.bytes_total : 0) ? b : a), null) || {};
+    const need = Math.max(0, ...pr.map(p => p.bytes_total || 0));
+    let ovw = ds.m_DownloadOverview; ovw = ovw && typeof ovw.values === "function" ? [...ovw.values()][0] : ovw && Object.values(ovw)[0];
+    const speed = ovw && ovw.update_network_bytes_per_second;
+    const paused = !it.active || (ovw && ovw.paused);
+    const eta = ut.overall_estimated_time_remaining_sec;
+    const appid = it.appid;
+    const dc = diskCache[appid];
+    if (!dc || Date.now() - dc.t > 30000) {
+      diskCache[appid] = {t: Date.now(), v: dc && dc.v};
+      call("disk", {appid}).then(v => { diskCache[appid] = {t: Date.now(), v}; }).catch(() => {});
+    }
+    const disk = diskCache[appid] && diskCache[appid].v;
+    const enough = disk && disk.free != null ? disk.free > Math.max(0, need - (dl.bytes_in_progress || 0)) : null;
+    const html = `<span>Stiahnuté <b>${fmtGB(dl.bytes_in_progress)}</b> z <b>${fmtGB(dl.bytes_total)}</b></span>` +
+      `<span>Zostáva <b>~ ${fmtETA(eta)}</b>${paused ? " (pri poslednej rýchlosti)" : speed ? ` · ${fmtGB(speed)}/s` : ""}</span>` +
+      (need ? `<span>Hra zaberie <b>${fmtGB(need)}</b></span>` : "") +
+      (disk && disk.free != null ? `<span>Voľné na disku <b style="color:${enough === false ? "#f87171" : "#dcdedf"}">${fmtGB(disk.free)}</b>${enough === false ? " – nestačí!" : ""}</span>` : "");
+    if (!info) { info = doc.createElement("div"); info.id = "psi-dlinfo"; track.insertAdjacentElement("afterend", info); }
+    if (info.innerHTML !== html) info.innerHTML = html;
+  }
+
   /* ---------------- vlastné písmo ---------------- */
   const FONT = {key: null, css: ""};
   async function refreshFont() {
@@ -901,7 +958,7 @@
   const featTimer = setInterval(refreshFeatures, 4000);
   const timer = setInterval(scan, 1000);
   const libTimer = setInterval(libraryTick, 350);
-  const extraTimer = setInterval(() => { try { libraryExtras(); } catch (e) {} }, 800);
+  const extraTimer = setInterval(() => { try { libraryExtras(); } catch (e) {} try { downloadsExtras(); } catch (e) {} }, 800);
   window.__psiCleanup = () => {
     active = false;
     clearInterval(timer);
@@ -914,7 +971,7 @@
       if (!doc) continue;
       const panel = doc.getElementById("psi-settings");
       if (panel) { [...panel.parentElement.children].forEach(ch => { ch.style.display = ""; }); panel.remove(); }
-      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme", "psi-extra"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
+      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme", "psi-extra", "psi-dl", "psi-dlinfo"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
       doc.querySelectorAll(".psi-lib, .psi-libcard").forEach(e => e.remove());
     }
   };
