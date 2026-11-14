@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.36";
+  const VERSION = "1.37";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -749,6 +749,16 @@
   }
   window.__psiSyncCollections = syncCollections;
 
+  /* knižnica pre PSI launcher (funguje aj bez zapnutého Steamu) */
+  async function exportLibrary() {
+    try {
+      const games = (window.collectionStore && collectionStore.GetCollection("type-games") || {}).allApps || [];
+      if (!games.length) return;
+      await call("save_library", {apps: games.map(a => ({appid: a.appid, name: a.display_name,
+        playtime: a.minutes_playtime_forever || 0, last_played: a.rt_last_time_played || 0}))});
+    } catch (e) {}
+  }
+
 
   /* ---------------- automatické zaoblenie všetkého viditeľného ---------------- */
   // Každý prvok s pozadím, rámikom, tieňom alebo obrázok/tlačidlo dostane zaoblené rohy.
@@ -984,6 +994,8 @@
   try { window.g_PopupManager && window.g_PopupManager.AddPopupCreatedCallback && window.g_PopupManager.AddPopupCreatedCallback(() => { if (active) { setTimeout(scan, 0); setTimeout(scan, 120); } }); } catch (e) {}
   refreshFeatures().then(() => { scan(); setTimeout(() => syncCollections(true), 5000); });
   const colTimer = setInterval(() => syncCollections(), 15 * 60e3);
+  setTimeout(exportLibrary, 4000);
+  const libExportTimer = setInterval(exportLibrary, 30 * 60e3);
   const featTimer = setInterval(refreshFeatures, 4000);
   const timer = setInterval(scan, 1000);
   const libTimer = setInterval(libraryTick, 350);
@@ -993,6 +1005,7 @@
     clearInterval(timer);
     clearInterval(featTimer);
     clearInterval(colTimer);
+    clearInterval(libExportTimer);
     clearInterval(libTimer);
     clearInterval(extraTimer);
     for (const p of (window.g_PopupManager && g_PopupManager.m_mapPopups ? g_PopupManager.m_mapPopups.values() : [])) {

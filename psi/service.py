@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import logging
 import re
 import shutil
@@ -297,6 +298,82 @@ class Psi:
             return {"path": str(best), "free": None, "total": None}
         return {"path": str(best), "free": u.free, "total": u.total}
 
+    # ------------------------------------------------------------------ knižnica pre launcher
+    def save_library(self, apps) -> dict:
+        """psi.js pošle zoznam vlastnených hier; doplníme dáta a uložíme library.json pre launcher."""
+        clean = []
+        for a in list(apps or [])[:5000]:
+            try:
+                clean.append({"appid": int(a["appid"]), "name": str(a.get("name") or "")[:200],
+                              "playtime": int(a.get("playtime") or 0), "last_played": int(a.get("last_played") or 0)})
+            except (KeyError, TypeError, ValueError):
+                continue
+        threading.Thread(target=self._write_library, args=(clean,), daemon=True, name="psi-library").start()
+        return {"count": len(clean)}
+
+    @staticmethod
+    def installed_games() -> dict:
+        """{appid: {dir, size, steamworks}} z appmanifest_*.acf vo všetkých knižniciach Steamu."""
+        root = core.steam_root()
+        out = {}
+        if not root:
+            return out
+        paths = []
+        try:
+            lf = core._ci(core.parse_vdf((root / "steamapps/libraryfolders.vdf").read_text(errors="replace")), "libraryfolders") or {}
+            paths = [Path(core._ci(v, "path")) for v in lf.values() if isinstance(v, dict) and core._ci(v, "path")]
+        except OSError:
+            pass
+        for lib in paths or [root]:
+            for man in (lib / "steamapps").glob("appmanifest_*.acf"):
+                try:
+                    st = core._ci(core.parse_vdf(man.read_text(errors="replace")), "AppState") or {}
+                    appid = int(core._ci(st, "appid"))
+                except (OSError, TypeError, ValueError):
+                    continue
+                gdir = lib / "steamapps/common" / str(core._ci(st, "installdir") or "")
+                full = (int(core._ci(st, "StateFlags") or 0) & 4) == 4
+                # Steamworks knižnica = hra pravdepodobne potrebuje bežiaci Steam
+                steamworks, n = False, 0
+                if gdir.is_dir():
+                    for dp, dn, fn in os.walk(gdir):
+                        n += 1
+                        if n > 4000 or dp.count(os.sep) - str(gdir).count(os.sep) > 4:
+                            dn[:] = []
+                            continue
+                        if any(f.lower() in ("libsteam_api.so", "steam_api.dll", "steam_api64.dll") for f in fn):
+                            steamworks = True
+                            break
+                out[appid] = {"dir": str(gdir), "size": int(core._ci(st, "SizeOnDisk") or 0),
+                              "installed": full, "steamworks": steamworks}
+        return out
+
+    def _write_library(self, apps: list) -> None:
+        from . import perf
+        try:
+            ids = [a["appid"] for a in apps]
+            tiers = self.tiers(ids)
+            store = SteamStore.items(ids)
+            inst = self.installed_games()
+            rows = []
+            for a in apps:
+                aid = a["appid"]
+                t, st, ins = tiers.get(str(aid), {}), store.get(aid, {}), inst.get(aid)
+                try:
+                    pe = perf.estimate(aid, st.get("linux", False))
+                    fps = {"high": pe.get("fps_high"), "low": pe.get("fps_low"), "preset": pe.get("preset")}
+                except Exception:
+                    fps = None
+                rows.append({**a, "installed": bool(ins and ins["installed"]), "size": ins["size"] if ins else 0,
+                             "steamworks": ins["steamworks"] if ins else None,
+                             "tier": t.get("tier", "pending"), "native": t.get("native", False), "deck": t.get("deck", 0),
+                             "anticheat": t.get("ac"), "anticheats": t.get("anticheats", []),
+                             "desc": st.get("desc", ""), "developers": st.get("developers", []), "fps": fps})
+            core.write_json(core.DATA_DIR / "library.json", {"generated": int(time.time()), "pc": perf.hardware(), "apps": rows})
+            log.info("library.json: %d hier pre launcher", len(rows))
+        except Exception:
+            log.exception("library.json")
+
     def theme(self) -> dict:
         return core.theme()
 
@@ -324,7 +401,7 @@ class Psi:
 BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
-               "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme", "disk"},
+               "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme", "disk", "save_library"},
     "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme"},
 }
 
@@ -448,6 +525,8 @@ class Injector(threading.Thread):
                 result = fn(str(args.get("family", "")))
             elif method == "upload_font":
                 result = fn(str(args.get("name", "")), str(args.get("data", "")))
+            elif method == "save_library":
+                result = fn(args.get("apps") or [])
             elif method == "set_theme":
                 result = fn(args.get("theme") or {})
             elif method == "set_feature":
