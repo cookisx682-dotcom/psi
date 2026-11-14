@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.29";
+  const VERSION = "1.34";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -633,7 +633,12 @@
   .ModalPosition_Content,.GenericConfirmDialog,.DialogContent_InnerWidth .DialogBody > .Panel{border-radius:12px}
   .ModalPosition_Content{overflow:hidden}
   img.avatar,.avatarHolder,.avatarFrame img{border-radius:8px}
-  ._1FnJ6dPuknQFQ2RTpKTI16{border-radius:10px;overflow:hidden}
+  /* INSTALL/PLAY + šípka = jeden zaoblený celok */
+  ._1FnJ6dPuknQFQ2RTpKTI16{border-radius:10px!important;gap:0!important;background:transparent!important}
+  ._1FnJ6dPuknQFQ2RTpKTI16 > *{margin:0!important;box-shadow:none!important}
+  ._1FnJ6dPuknQFQ2RTpKTI16 > :only-child{border-radius:10px!important}
+  ._1FnJ6dPuknQFQ2RTpKTI16 > :first-child:not(:only-child){border-radius:10px 0 0 10px!important}
+  ._1FnJ6dPuknQFQ2RTpKTI16 > :last-child:not(:only-child){border-radius:0 10px 10px 0!important;border-left:1px solid rgba(0,0,0,.25)!important;filter:brightness(.9)}
   ._2r4TK4BAuU-J4FuF_O7v_5{border-radius:10px;overflow:hidden}
   ._3qDWQGB0rtwM3qpXTb11Q-{border-radius:8px}
   .psi-libcard{border-radius:12px!important}.psi-pcard{border-radius:10px!important}
@@ -864,7 +869,17 @@
 
   /* ---------------- Stiahnuté: hlavička, dúhový pruh, čas / GB / voľné miesto ---------------- */
   const DL_CSS = `
-  ._1VNuYHM6BPBOJspC6zPf5r:has(._2sCvZTD6ZTZz3p9_ekH_gI){background:transparent!important;height:auto!important;min-height:0!important;overflow:visible!important;padding:12px 16px 6px!important}
+  ._1VNuYHM6BPBOJspC6zPf5r:has(._2sCvZTD6ZTZz3p9_ekH_gI){background:transparent!important;height:auto!important;min-height:0!important;overflow:visible!important;padding:12px 30px 4px 16px!important}
+  /* rodičia hlavičky mali pevnú výšku 200 px → spodok karty sa odrezal */
+  ._21P7c4MWmsU2QSZeL-uyZo:has(._2sCvZTD6ZTZz3p9_ekH_gI),.OINnOU8K5HzPe2nzczpZi:has(._2sCvZTD6ZTZz3p9_ekH_gI),
+  ._3Mbhnlk1Go2j8yCdjthzc7.IbePLaw-vSvhG1GTenYFg:has(._2sCvZTD6ZTZz3p9_ekH_gI),._373v1eWNyaPKhgnea9FZSt:has(._2sCvZTD6ZTZz3p9_ekH_gI),
+  ._3Mbhnlk1Go2j8yCdjthzc7:has(._2sCvZTD6ZTZz3p9_ekH_gI){height:auto!important;min-height:0!important;max-height:none!important;flex:0 0 auto!important;overflow:visible!important}
+  /* Up Next / Scheduled / … ako rovnaké sklenené karty */
+  ._1ugNiylO2vKXhirsGocAxa > ._3Mbhnlk1Go2j8yCdjthzc7{margin:10px 16px!important;width:auto!important;padding:4px 0 12px!important;border-radius:var(--psi-radius,12px)!important;
+    background:var(--psi-panel,rgba(18,28,44,.62))!important;border:1px solid rgba(255,255,255,.04)!important;box-sizing:border-box}
+  ._1ugNiylO2vKXhirsGocAxa ._3ebCJiEl-ybizhZ4avcFw5{margin:4px 12px!important;border-radius:calc(var(--psi-radius,12px) - 2px)!important;background:rgba(255,255,255,.045)!important;overflow:hidden!important}
+  ._1ugNiylO2vKXhirsGocAxa ._3ebCJiEl-ybizhZ4avcFw5 *{background-color:transparent}
+  ._1ugNiylO2vKXhirsGocAxa ._3ebCJiEl-ybizhZ4avcFw5 img{border-radius:8px!important}
   ._2sCvZTD6ZTZz3p9_ekH_gI{position:relative!important;width:100%!important;box-sizing:border-box;border-radius:var(--psi-radius,12px)!important;
     overflow:hidden!important;background:var(--psi-panel,rgba(18,28,44,.62))!important;border:1px solid rgba(255,255,255,.04)}
   ._3WauYi7bNDSGIogMLPVYES{-webkit-mask-image:linear-gradient(to right,#000 35%,transparent 92%),linear-gradient(to bottom,transparent 0%,#000 22%,#000 62%,transparent 100%)!important;
