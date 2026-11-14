@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.19";
+  const VERSION = "1.21";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -776,6 +776,84 @@
     schedule();
   }
 
+
+  /* ---------------- knižnica: NEW!! pri čerstvých novinkách, dúhový pruh achievementov ---------------- */
+  const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+  const NEW_DAYS = 7, FADE_DAYS = 21, NEW_SINCE_PLAY_MAX = 30;
+  function feedAge(text) {
+    const t = text.trim().toLowerCase();
+    if (/^(today|dnes)/.test(t)) return 0;
+    if (/^(yesterday|včera)/.test(t)) return 1;
+    const m = /^([a-z]+)\s+(\d{1,2})(?:,\s*(\d{4}))?$/.exec(t);
+    if (!m || MONTHS.indexOf(m[1]) < 0) return null;
+    const now = new Date();
+    let d = new Date(m[3] ? +m[3] : now.getFullYear(), MONTHS.indexOf(m[1]), +m[2]);
+    if (!m[3] && d > now) d.setFullYear(d.getFullYear() - 1);
+    return Math.floor((now - d) / 864e5);
+  }
+  const EXTRA_CSS = `
+  @keyframes psiRainbow{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+  @keyframes psiPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  .psi-rainbow{background:linear-gradient(90deg,#ff3b3b,#ff9f1a,#ffe14d,#3ddc84,#22d3ee,#4f7cff,#b05cff,#ff3b3b)!important;
+    background-size:200% 100%!important;animation:psiRainbow 4s linear infinite;border-radius:99px!important;box-shadow:0 0 10px rgba(255,255,255,.18)}
+  .psi-rainbow-track{border-radius:99px!important;overflow:hidden;background:rgba(0,0,0,.45)!important}
+  .psi-newcard{position:relative;border-radius:var(--psi-radius,12px)!important;transition:box-shadow .3s}
+  .psi-newbadge{position:absolute;top:10px;right:12px;z-index:5;padding:3px 10px;border-radius:99px;font:800 11px/1.4 "Motiva Sans",Arial,sans-serif;
+    letter-spacing:.08em;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4);pointer-events:none;
+    background:linear-gradient(90deg,#ff3b3b,#ff9f1a,#ffe14d,#3ddc84,#22d3ee,#4f7cff,#b05cff,#ff3b3b);background-size:200% 100%;
+    animation:psiRainbow 3s linear infinite,psiPulse 1.6s ease-in-out infinite;box-shadow:0 2px 10px rgba(0,0,0,.35)}`;
+  let achScanT = 0;
+  function libraryExtras() {
+    if (!FEAT.rounded) return;
+    const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
+    const doc = pop && pop.m_popup && pop.m_popup.document;
+    if (!doc) return;
+    if (!doc.getElementById("psi-extra")) { const st = doc.createElement("style"); st.id = "psi-extra"; st.textContent = EXTRA_CSS; doc.head.appendChild(st); }
+    // noviny / aktualizácie – NEW!! = posledných 7 dní alebo od tvojho posledného hrania (max 30 dní)
+    const loc = window.MainWindowBrowserManager && MainWindowBrowserManager.m_lastLocation;
+    const am = loc && /^\/library\/app\/(\d+)/.exec(loc.pathname || "");
+    let lastPlayed = 0;
+    try { lastPlayed = am && window.appStore ? (appStore.GetAppOverviewByAppID(+am[1]) || {}).rt_last_time_played || 0 : 0; } catch (e) {}
+    for (const h of doc.querySelectorAll("h4")) {
+      if (h.dataset.psiAge !== undefined || !h.offsetParent) continue;
+      const age = feedAge(h.textContent);
+      h.dataset.psiAge = age == null ? "x" : String(age);
+      if (age == null || age > FADE_DAYS) continue;
+      const card = h.parentElement && h.parentElement.lastElementChild;
+      if (!card || card === h) continue;
+      const a = Math.max(0, 1 - age / FADE_DAYS);                 // čím starší, tým slabší rámček
+      const acc = THEME.accent || "#1a9fff";
+      card.classList.add("psi-newcard");
+      card.style.boxShadow = `0 0 0 ${a > .5 ? 2 : 1}px ${acc}${Math.round(a * 255).toString(16).padStart(2, "0")},` +
+        `0 0 ${Math.round(8 + 22 * a)}px ${acc}${Math.round(a * 140).toString(16).padStart(2, "0")}`;
+      const posted = Date.now() / 1000 - age * 86400;
+      const sincePlay = lastPlayed > 0 && posted > lastPlayed && age <= NEW_SINCE_PLAY_MAX;
+      if ((age <= NEW_DAYS || sincePlay) && !card.querySelector(".psi-newbadge")) {
+        const b = doc.createElement("span"); b.className = "psi-newbadge"; b.textContent = "NEW!!";
+        b.title = (age === 0 ? "Dnes" : age === 1 ? "Včera" : `Pred ${age} dňami`) + (sincePlay ? " · od tvojho posledného hrania" : "");
+        card.appendChild(b);
+      }
+    }
+    // dúhový pruh achievementov
+    let fills = [...doc.querySelectorAll("._3Rm36_oeAhvIg6ZYP9l1Jj:not(.psi-rainbow)")];
+    if (!fills.length && Date.now() - achScanT > 4000) {          // záloha podľa textu „unlocked“
+      achScanT = Date.now();
+      const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT); let n;
+      while ((n = w.nextNode())) {
+        if (!/unlocked|odomkn/i.test(n.textContent) || !n.parentElement.offsetParent) continue;
+        let box = n.parentElement; for (let i = 0; i < 3 && box.parentElement; i++) box = box.parentElement;
+        const bars = [...box.querySelectorAll("div")].filter(x => { const r = x.getBoundingClientRect(); return r.height > 3 && r.height < 14 && r.width > 4; });
+        if (bars.length >= 2) fills.push(bars[bars.length - 1]);
+        break;
+      }
+    }
+    for (const f of fills) {
+      if (f.classList.contains("psi-rainbow")) continue;
+      f.classList.add("psi-rainbow");
+      f.parentElement && f.parentElement.classList.add("psi-rainbow-track");
+    }
+  }
+
   /* ---------------- vlastné písmo ---------------- */
   const FONT = {key: null, css: ""};
   async function refreshFont() {
@@ -816,18 +894,20 @@
   const featTimer = setInterval(refreshFeatures, 4000);
   const timer = setInterval(scan, 1000);
   const libTimer = setInterval(libraryTick, 350);
+  const extraTimer = setInterval(() => { try { libraryExtras(); } catch (e) {} }, 800);
   window.__psiCleanup = () => {
     active = false;
     clearInterval(timer);
     clearInterval(featTimer);
     clearInterval(colTimer);
     clearInterval(libTimer);
+    clearInterval(extraTimer);
     for (const p of (window.g_PopupManager && g_PopupManager.m_mapPopups ? g_PopupManager.m_mapPopups.values() : [])) {
       const doc = p.m_popup && p.m_popup.document;
       if (!doc) continue;
       const panel = doc.getElementById("psi-settings");
       if (panel) { [...panel.parentElement.children].forEach(ch => { ch.style.display = ""; }); panel.remove(); }
-      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
+      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme", "psi-extra"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
       doc.querySelectorAll(".psi-lib, .psi-libcard").forEach(e => e.remove());
     }
   };
