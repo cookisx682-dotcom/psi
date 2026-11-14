@@ -170,9 +170,42 @@
     if (f.rounded === false) return;
     addStyle("psi-round", ROUND_WEB);
     window.__psiApplyTheme(t);
+    document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", startNav) : startNav();
     const startAuto = () => psiAutoRound(document, () => true);
     document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", startAuto) : startAuto();
   };
+
+  /* horný panel obchodu: zmizne pri posune nadol, ukáže sa úplne hore alebo pri myši pri hornom okraji */
+  function psiAutoHideNav() {
+    const nav = document.querySelector('[role="navigation"][aria-label="Store menu"]');
+    if (!nav) return false;
+    let wrap = nav;
+    for (let e = nav.parentElement; e && e !== document.body; e = e.parentElement) {
+      const pos = getComputedStyle(e).position;
+      if (pos === "sticky" || pos === "fixed") { wrap = e; break; }
+    }
+    if (wrap.classList.contains("psi-nav-wrap")) return true;
+    wrap.classList.add("psi-nav-wrap");
+    addStyle("psi-nav", `.psi-nav-wrap{transition:transform .22s ease,opacity .18s ease;will-change:transform}
+      html.psi-nav-hidden .psi-nav-wrap{transform:translateY(-130%);opacity:0;pointer-events:none}`);
+    const root = document.documentElement;
+    let nearTop = false;
+    const update = () => {
+      const show = window.scrollY <= 2 || nearTop || wrap.matches(":hover") || wrap.contains(document.activeElement);
+      root.classList.toggle("psi-nav-hidden", !show);
+    };
+    window.addEventListener("scroll", update, {passive: true});
+    document.addEventListener("mousemove", e => {
+      const was = nearTop;
+      nearTop = e.clientY < 70 || (nearTop && wrap.matches(":hover"));
+      if (was !== nearTop) update();
+    }, {passive: true});
+    document.addEventListener("mouseleave", () => { nearTop = false; update(); });
+    wrap.addEventListener("focusout", () => setTimeout(update, 0));
+    update();
+    return true;
+  }
+  const startNav = () => { if (!psiAutoHideNav()) { let n = 0; const iv = setInterval(() => { if (psiAutoHideNav() || ++n > 40) clearInterval(iv); }, 150); } };
   const BOOT = window.__PSI_BOOT || null;
   if (BOOT) {                                   // okamžite – údaje vložila služba spolu so skriptom
     applyLook(BOOT.features || {}, BOOT.theme || {});
