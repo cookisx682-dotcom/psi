@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.34";
+  const VERSION = "1.36";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -755,8 +755,10 @@
   // Preskočí: SVG, prvky cez celú šírku okna, malé ikonky a prvky, ktoré už zaoblené sú.
   function psiAutoRound(doc, isOn) {
     const win = doc.defaultView;
-    if (!win || win.__psiAutoRound) return;
-    win.__psiAutoRound = true;
+    const AR_KEY = VERSION;
+    if (!win || win.__psiAutoRound === AR_KEY) return;
+    try { win.__psiAutoRoundStop && win.__psiAutoRoundStop(); } catch (e) {}   // zastav staršiu verziu
+    win.__psiAutoRound = AR_KEY;
     const done = new WeakSet();
     const MEDIA = /^(IMG|VIDEO|INPUT|BUTTON|SELECT|TEXTAREA|CANVAS)$/;
     let timer = null;
@@ -769,7 +771,16 @@
         const r = e.getBoundingClientRect();
         if (!r.width || !r.height) continue;              // skryté – skúsime neskôr
         done.add(e);
+        if (/border-radius/.test(e.getAttribute("style") || "") && !e.dataset.psiAr) {
+          e.style.removeProperty("border-radius");          // zvyšok zo staršej verzie – prepočíta sa nižšie
+        }
         if (r.width < 14 || r.height < 12 || r.width > vw * 0.97 || e.closest("svg")) continue;
+        // veľké panely rozloženia (ľavý zoznam, oblasť obrázka hry…) nezaobľovať – robili „zuby“ pri hornej lište
+        const vh = win.innerHeight || 1;
+        if (r.height > vh * 0.45 || (r.width > vw * 0.6 && r.top < 140) || (r.top < 92 && r.height > 30)) {
+          if (e.dataset.psiAr || /border-radius/.test(e.getAttribute("style") || "")) { e.style.removeProperty("border-radius"); delete e.dataset.psiAr; }
+          continue;
+        }
         if (e.closest(".ContextMenuPopupBody") && r.width > vw * 0.9) continue;
         const cs = win.getComputedStyle(e);
         if (cs.borderTopLeftRadius !== "0px" || (cs.display === "inline" && e.tagName === "SPAN")) continue;
@@ -779,11 +790,14 @@
         if (!visible) continue;
         const rad = Math.min(+THEME.radius || 12, Math.max(4, Math.round(Math.min(r.width, r.height) / 4)));
         e.style.setProperty("border-radius", rad + "px");
+        e.dataset.psiAr = "1";
       }
     };
     const schedule = () => { if (!timer) timer = win.setTimeout(pass, 450); };
-    new win.MutationObserver(schedule).observe(doc.documentElement, {childList: true, subtree: true});
+    const mo = new win.MutationObserver(schedule);
+    mo.observe(doc.documentElement, {childList: true, subtree: true});
     win.addEventListener("scroll", schedule, {passive: true});
+    win.__psiAutoRoundStop = () => { mo.disconnect(); win.removeEventListener("scroll", schedule); if (timer) win.clearTimeout(timer); };
     schedule();
   }
 

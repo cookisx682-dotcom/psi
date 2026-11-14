@@ -97,8 +97,10 @@
   // Preskočí: SVG, prvky cez celú šírku okna, malé ikonky a prvky, ktoré už zaoblené sú.
   function psiAutoRound(doc, isOn) {
     const win = doc.defaultView;
-    if (!win || win.__psiAutoRound) return;
-    win.__psiAutoRound = true;
+    const AR_KEY = "web-2";
+    if (!win || win.__psiAutoRound === AR_KEY) return;
+    try { win.__psiAutoRoundStop && win.__psiAutoRoundStop(); } catch (e) {}   // zastav staršiu verziu
+    win.__psiAutoRound = AR_KEY;
     const done = new WeakSet();
     const MEDIA = /^(IMG|VIDEO|INPUT|BUTTON|SELECT|TEXTAREA|CANVAS)$/;
     let timer = null;
@@ -124,8 +126,10 @@
       }
     };
     const schedule = () => { if (!timer) timer = win.setTimeout(pass, 450); };
-    new win.MutationObserver(schedule).observe(doc.documentElement, {childList: true, subtree: true});
+    const mo = new win.MutationObserver(schedule);
+    mo.observe(doc.documentElement, {childList: true, subtree: true});
     win.addEventListener("scroll", schedule, {passive: true});
+    win.__psiAutoRoundStop = () => { mo.disconnect(); win.removeEventListener("scroll", schedule); if (timer) win.clearTimeout(timer); };
     schedule();
   }
   /* ---------------- vlastná téma (Nastavenia → PSI → Vzhľad) ---------------- */
