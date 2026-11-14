@@ -129,6 +129,30 @@ def set_feature(name: str, value: bool) -> dict:
     return features()
 
 
+DEFAULT_THEME = {"accent": "#1a9fff", "panel": "#121c2c", "opacity": 0.62, "blur": 10, "radius": 12}
+
+
+def theme() -> dict:
+    t = {**DEFAULT_THEME, **(config().get("theme") or {})}
+    return t
+
+
+def set_theme(t: dict) -> dict:
+    hexre = re.compile(r"^#[0-9a-fA-F]{6}$")
+    clean = dict(DEFAULT_THEME)
+    if isinstance(t, dict):
+        for k in ("accent", "panel"):
+            if hexre.match(str(t.get(k, ""))):
+                clean[k] = str(t[k]).lower()
+        for k, lo, hi in (("opacity", 0.0, 1.0), ("blur", 0, 30), ("radius", 0, 28)):
+            try:
+                clean[k] = round(min(hi, max(lo, float(t.get(k, clean[k])))), 2)
+            except (TypeError, ValueError):
+                pass
+    CONFIG.update(lambda c: c.__setitem__("theme", clean))
+    return clean
+
+
 def _default_config() -> dict:
     return {
         "country": COUNTRY,

@@ -31,6 +31,15 @@ class Psi:
         self._lock = threading.Lock()
         self._memo: dict = {}
         self.companion = None  # nastaví CompanionServer
+        self.theme_listeners: list = []
+        self.change_listeners: list = []
+
+    def _changed(self) -> None:
+        for fn in list(self.change_listeners):
+            try:
+                fn()
+            except Exception:
+                log.exception("zmena nastavení")
 
     # ------------------------------------------------------------------ memo
     def _cached(self, key, ttl, fn, refresh=False):
@@ -171,6 +180,7 @@ class Psi:
     def set_font(self, family: str) -> dict:
         family = re.sub(r'["\\;{}<>]', "", str(family or ""))[:80]
         CONFIG.update(lambda c: c.__setitem__("font", {"family": family, "file": ""}))
+        self._changed()
         return self.fonts()
 
     def upload_font(self, name: str, data_b64: str) -> dict:
@@ -191,6 +201,7 @@ class Psi:
         (folder / fname).write_bytes(raw)
         family = f"PSI {stem}"
         CONFIG.update(lambda c: c.__setitem__("font", {"family": family, "file": fname}))
+        self._changed()
         return self.fonts()
 
     def game(self, appid: int) -> dict:
@@ -254,9 +265,22 @@ class Psi:
 
     def set_feature(self, name: str, value: bool) -> dict:
         f = core.set_feature(name, value)
+        self._changed()
         if self.companion and name == "companion_lan":
             self.companion.wake()
         return f
+
+    def theme(self) -> dict:
+        return core.theme()
+
+    def set_theme(self, t: dict) -> dict:
+        new = core.set_theme(t)
+        for fn in list(self.theme_listeners):
+            try:
+                fn(new)
+            except Exception:
+                log.exception("téma")
+        return new
 
     def new_pin(self) -> dict:
         core.ensure_pin(regenerate=True)
@@ -273,8 +297,8 @@ class Psi:
 BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
-               "companion_qr", "features", "set_feature", "new_pin"},
-    "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css"},
+               "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme"},
+    "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme"},
 }
 
 
@@ -285,6 +309,16 @@ class Injector(threading.Thread):
         self.sessions: dict[str, cdp.Session] = {}
         self.pool = ThreadPoolExecutor(4, thread_name_prefix="psi-bridge")
         self._warned = False
+        self.browser_ok = False
+        psi.theme_listeners.append(self.broadcast_theme)
+
+    def broadcast_theme(self, t: dict) -> None:
+        expr = f"window.__psiApplyTheme && window.__psiApplyTheme({json.dumps(t)})"
+        for s in list(self.sessions.values()):
+            try:
+                s.notify("Runtime.evaluate", {"expression": expr})
+            except OSError:
+                pass
 
     @staticmethod
     def kind(t: dict) -> str | None:
@@ -299,7 +333,16 @@ class Injector(threading.Thread):
 
     def script(self, kind: str) -> str:
         files = ["psi.js"] if kind == "shared" else ["store.js", "community.js"]
-        return "\n;\n".join((INJECT / f).read_text(encoding="utf-8") for f in files)
+        body = "\n;\n".join((INJECT / f).read_text(encoding="utf-8") for f in files)
+        if kind == "web":
+            # štýly sa aplikujú synchrónne hneď na začiatku stránky – bez čakania na most
+            boot = {"features": core.features(), "theme": core.theme()}
+            try:
+                boot["font"] = self.psi.font_css()
+            except Exception:
+                boot["font"] = {"family": "", "face": ""}
+            body = f"window.__PSI_BOOT = {json.dumps(boot, ensure_ascii=False)};\n" + body
+        return body
 
     def run(self) -> None:
         while True:
@@ -324,7 +367,7 @@ class Injector(threading.Thread):
         live = set()
         for t in targets:
             k = self.kind(t)
-            if not k:
+            if not k or (k == "web" and self.browser_ok):
                 continue
             live.add(t["id"])
             s = self.sessions.get(t["id"])
@@ -360,6 +403,7 @@ class Injector(threading.Thread):
         self.pool.submit(self.handle, s, kind, params)
 
     def handle(self, s: cdp.Session, kind: str, params: dict) -> None:
+        sid = params.get("__sid")
         rid = None
         try:
             req = json.loads(params.get("payload") or "{}")
@@ -377,6 +421,8 @@ class Injector(threading.Thread):
                 result = fn(str(args.get("family", "")))
             elif method == "upload_font":
                 result = fn(str(args.get("name", "")), str(args.get("data", "")))
+            elif method == "set_theme":
+                result = fn(args.get("theme") or {})
             elif method == "set_feature":
                 result = fn(str(args.get("name")), bool(args.get("value")))
             else:
@@ -386,9 +432,122 @@ class Injector(threading.Thread):
             reply = {"ok": False, "error": str(e)}
         expr = f"window.__psiReply && window.__psiReply({json.dumps(rid)}, {json.dumps(reply, ensure_ascii=False)})"
         try:
-            s.notify("Runtime.evaluate", {"expression": expr, "contextId": params.get("executionContextId")})
+            s.notify("Runtime.evaluate", {"expression": expr, "contextId": params.get("executionContextId")}, session_id=sid)
         except OSError:
             pass
+
+
+class BrowserWatch(threading.Thread):
+    """Okamžité vloženie do stránok obchodu/komunity.
+
+    Cez kanál celého prehliadača Steamu (Target.setDiscoverTargets) sa PSI pripojí
+    ku každej stránke hneď, ako vznikne, a zaregistruje skript, ktorý sa spustí na
+    úplnom začiatku každého načítania (document start) – štýly sú tam skôr, než sa
+    stránka vykreslí. Pri zmene témy/písma/prepínačov sa skript obnoví.
+    """
+
+    def __init__(self, injector: "Injector"):
+        super().__init__(daemon=True, name="psi-browser")
+        self.injector = injector
+        self.session: cdp.Session | None = None
+        self.pool = ThreadPoolExecutor(4, thread_name_prefix="psi-attach")
+        self.lock = threading.Lock()
+        self.targets: dict = {}   # targetId -> {"sid": ..., "script": id}
+        self.web_sids: set = set()
+
+    @staticmethod
+    def wanted(ti: dict) -> bool:
+        if ti.get("type") != "page" or ti.get("title") == "SharedJSContext":
+            return False
+        url = ti.get("url", "")
+        if "createflags=" in url or "steamloopback.host" in url:
+            return False
+        return url.startswith(("https://store.steampowered.com/", "https://steamcommunity.com/")) or \
+            url in ("", "about:blank") or url.startswith("data:text/html")
+
+    def run(self) -> None:
+        while True:
+            try:
+                ws = cdp.browser_ws()
+                if ws:
+                    s = cdp.Session({"webSocketDebuggerUrl": ws, "title": "browser"}, self.on_event)
+                    self.session = s
+                    s.call("Target.setDiscoverTargets", {"discover": True})
+                    self.injector.browser_ok = True
+                    log.info("PSI: okamžité vkladanie do stránok obchodu zapnuté")
+                    while s.alive:
+                        time.sleep(1)
+            except Exception as e:
+                log.debug("browser watch: %s", e)
+            self.injector.browser_ok = False
+            with self.lock:
+                self.targets.clear()
+                self.web_sids.clear()
+            time.sleep(3)
+
+    def on_event(self, s: cdp.Session, method: str, params: dict) -> None:
+        if method in ("Target.targetCreated", "Target.targetInfoChanged"):
+            ti = params.get("targetInfo") or {}
+            tid = ti.get("targetId")
+            if tid and self.wanted(ti):
+                with self.lock:
+                    if tid in self.targets:
+                        return
+                    self.targets[tid] = {"sid": None, "script": None}
+                self.pool.submit(self.attach, s, ti)
+        elif method == "Target.targetDestroyed":
+            with self.lock:
+                info = self.targets.pop(params.get("targetId"), None)
+                if info:
+                    self.web_sids.discard(info.get("sid"))
+        elif method == "Runtime.bindingCalled" and params.get("name") == "__psiBridge" and params.get("__sid") in self.web_sids:
+            self.injector.pool.submit(self.injector.handle, s, "web", params)
+
+    def attach(self, s: cdp.Session, ti: dict) -> None:
+        tid = ti["targetId"]
+        try:
+            sid = s.call("Target.attachToTarget", {"targetId": tid, "flatten": True})["sessionId"]
+            src = self.injector.script("web")
+            s.call("Page.enable", session_id=sid)
+            s.call("Runtime.enable", session_id=sid)
+            s.call("Runtime.addBinding", {"name": "__psiBridge"}, session_id=sid)
+            ident = s.call("Page.addScriptToEvaluateOnNewDocument", {"source": src}, session_id=sid).get("identifier")
+            with self.lock:
+                self.targets[tid] = {"sid": sid, "script": ident}
+                self.web_sids.add(sid)
+            s.call("Runtime.evaluate", {"expression": src}, session_id=sid)   # aktuálne načítaná stránka
+            log.info("PSI pripojené k %s", (ti.get("url") or "nová stránka")[:70])
+        except Exception as e:
+            log.debug("attach %s: %s", ti.get("url"), e)
+            with self.lock:
+                self.targets.pop(tid, None)
+
+    def refresh(self) -> None:
+        """Nová téma/písmo/prepínače → nový skript pre ďalšie načítania."""
+        s = self.session
+        if not s or not s.alive:
+            return
+        src = self.injector.script("web")
+        with self.lock:
+            items = list(self.targets.items())
+        for tid, info in items:
+            sid = info.get("sid")
+            if not sid:
+                continue
+            try:
+                if info.get("script"):
+                    s.call("Page.removeScriptToEvaluateOnNewDocument", {"identifier": info["script"]}, session_id=sid)
+                info["script"] = s.call("Page.addScriptToEvaluateOnNewDocument", {"source": src}, session_id=sid).get("identifier")
+            except Exception:
+                pass
+
+    def broadcast(self, expr: str) -> None:
+        s = self.session
+        for sid in list(self.web_sids):
+            try:
+                s.notify("Runtime.evaluate", {"expression": expr}, session_id=sid)
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------- spustenie
@@ -466,7 +625,13 @@ def main() -> None:
     psi = Psi()
     threading.Thread(target=snapshot_loop, daemon=True, name="psi-snapshots").start()
     threading.Thread(target=deal_loop, args=(psi,), daemon=True, name="psi-deals").start()
-    Injector(psi).start()
+    inj = Injector(psi)
+    inj.start()
+    bw = BrowserWatch(inj)
+    bw.start()
+    psi.theme_listeners.append(lambda t: bw.broadcast(f"window.__psiApplyTheme && window.__psiApplyTheme({json.dumps(t)})"))
+    psi.theme_listeners.append(lambda t: bw.refresh())
+    psi.change_listeners.append(bw.refresh)
     if config()["companion"].get("enabled", True):
         from .companion.server import CompanionServer
         CompanionServer(psi).start()  # samostatné vlákno

@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.18";
+  const VERSION = "1.19";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -101,7 +101,40 @@
   #psi-settings .psi-sw.on::after{transform:translateX(22px);background:#fff}
   #psi-settings .psi-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
   #psi-settings .psi-badges span{padding:4px 10px;border-radius:99px;background:rgba(139,92,246,.18);border:1px solid rgba(139,92,246,.4);font-size:12px}
-  #psi-settings .psi-err{color:#f87171}`;
+  #psi-settings .psi-err{color:#f87171}
+  #psi-settings .psi-trow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0}
+  #psi-settings .psi-trow input[type=color]{width:38px;height:28px;border:0;border-radius:8px;background:none;padding:0;cursor:pointer}
+  #psi-settings .psi-trow input[type=range]{width:150px;accent-color:var(--psi-accent,#1a9fff)}
+  #psi-settings .psi-trow b{min-width:48px;text-align:right;color:#fff;font-weight:500}
+  #psi-settings .psi-hex{width:78px;height:28px;border-radius:8px;border:0;background:#32353c;color:#fff;padding:0 8px;font-family:monospace}
+  #psi-settings .psi-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:99px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.05);color:#dcdedf;cursor:pointer;font-size:12.5px}
+  #psi-settings .psi-chip:hover{background:rgba(255,255,255,.1)}
+  #psi-settings .psi-chip i{width:12px;height:12px;border-radius:50%}
+  #psi-settings .psi-prev{--a:#1a9fff;--p:rgba(18,28,44,.62);--b:10px;--r:12px;position:relative;width:330px;height:236px;overflow:hidden;border-radius:14px;background:#14202e}
+  #psi-settings .pv-blob{position:absolute;width:150px;height:150px;border-radius:50%;filter:blur(8px);opacity:.85}
+  #psi-settings .pv-bar{position:absolute;left:10px;right:10px;top:10px;height:26px;display:flex;gap:14px;align-items:center;padding:0 12px;font-size:10px;letter-spacing:.06em;color:#c7d5e0;
+    background:var(--p);backdrop-filter:blur(var(--b));border-radius:var(--r)}
+  #psi-settings .pv-bar .pv-on{color:var(--a)}
+  #psi-settings .pv-side{position:absolute;left:10px;top:44px;bottom:10px;width:84px;padding:6px;background:var(--p);backdrop-filter:blur(var(--b));border-radius:var(--r)}
+  #psi-settings .pv-item{font-size:10px;color:#c7d5e0;padding:5px 6px;border-radius:calc(var(--r) / 2)}
+  #psi-settings .pv-sel{background:rgba(255,255,255,.12);color:#fff}
+  #psi-settings .pv-win{position:absolute;left:102px;right:10px;top:44px;bottom:10px;padding:8px;background:var(--p);backdrop-filter:blur(var(--b));border-radius:var(--r);overflow:hidden}
+  #psi-settings .pv-hero{height:52px;border-radius:calc(var(--r) * .7);background:linear-gradient(120deg,#3b5b7a,#b0613d);-webkit-mask-image:linear-gradient(#000 50%,transparent)}
+  #psi-settings .pv-row{display:flex;gap:10px;align-items:center;margin:6px 0;font-size:8.5px;color:#8f98a0}
+  #psi-settings .pv-row b{color:#fff;font-size:10px}
+  #psi-settings .pv-play{border:0;background:var(--a);color:#fff;font-size:10px;padding:5px 10px;border-radius:calc(var(--r) * .6)}
+  #psi-settings .pv-card{display:flex;flex-direction:column;gap:3px;padding:7px 8px;font-size:9px;color:#c6d4df;background:rgba(255,255,255,.05);border-radius:calc(var(--r) * .7)}
+  #psi-settings .pv-card b{font-size:9px;letter-spacing:.06em;color:#fff}
+  #psi-settings .pv-card em{font-style:normal;color:var(--a);font-size:12px}`;
+
+  const PRESETS = [
+    {name: "Steam", accent: "#1a9fff", panel: "#121c2c", opacity: 0.62, blur: 10, radius: 12},
+    {name: "Fialová noc", accent: "#8b5cf6", panel: "#1a1430", opacity: 0.55, blur: 14, radius: 16},
+    {name: "Cyan sklo", accent: "#22d3ee", panel: "#0b1a26", opacity: 0.42, blur: 18, radius: 18},
+    {name: "Ružová", accent: "#ec4899", panel: "#1f1020", opacity: 0.55, blur: 12, radius: 14},
+    {name: "Zelená", accent: "#22c55e", panel: "#0f1d16", opacity: 0.6, blur: 10, radius: 12},
+    {name: "OLED čierna", accent: "#3b82f6", panel: "#000000", opacity: 0.88, blur: 0, radius: 10},
+  ];
 
   /* ---------------- sekcia v Nastaveniach ---------------- */
   const FEATURES = [
@@ -209,9 +242,9 @@
   async function renderInner(doc) {
     const body = doc.getElementById("psi-body");
     if (!body) return;
-    let c, q, f, fonts;
+    let c, q, f, fonts, theme;
     try {
-      [c, q, f, fonts] = await Promise.all([call("companion_info"), call("companion_qr"), call("features"), call("fonts")]);
+      [c, q, f, fonts, theme] = await Promise.all([call("companion_info"), call("companion_qr"), call("features"), call("fonts"), call("theme")]);
     } catch (e) {
       body.innerHTML = `<div class="psi-card psi-err">PSI služba neodpovedá: ${esc(e.message)}<br><span class="psi-mut">Skontroluj: systemctl --user status psi</span></div>`;
       return;
@@ -220,6 +253,46 @@
       <div class="psi-card">
         <div class="psi-h">Funkcie</div>
         ${FEATURES.map(([k, name, desc]) => `<div class="psi-feat"><div><b>${esc(name)}</b><span class="psi-mut">${esc(desc)}</span></div><div class="psi-sw ${f[k] ? "on" : ""}" data-f="${k}" role="switch" aria-checked="${!!f[k]}"></div></div>`).join("")}
+      </div>
+
+
+      <div class="psi-card">
+        <div class="psi-h">Vzhľad · vlastná téma</div>
+        <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
+          <div style="flex:1;min-width:250px" id="psi-tform">
+            ${[["accent", "Akcentová farba"], ["panel", "Farba panelov"]].map(([k, l]) => `
+              <div class="psi-trow"><span>${l}</span>
+                <span style="display:flex;gap:8px;align-items:center"><input type="color" data-t="${k}" value="${esc(theme[k])}">
+                <input type="text" data-hex="${k}" value="${esc(theme[k])}" maxlength="7" class="psi-hex"></span></div>`).join("")}
+            ${[["opacity", "Priehľadnosť panelov", 0.1, 1, 0.02, v => Math.round((1 - v) * 100) + " %"], ["blur", "Rozmazanie (sklo)", 0, 30, 1, v => v + " px"],
+               ["radius", "Zaoblenie rohov", 0, 28, 1, v => v + " px"]].map(([k, l, mn, mx, st, f]) => `
+              <div class="psi-trow"><span>${l}</span><span style="display:flex;gap:10px;align-items:center">
+                <input type="range" data-t="${k}" min="${mn}" max="${mx}" step="${st}" value="${theme[k]}"><b data-v="${k}">${f(+theme[k])}</b></span></div>`).join("")}
+            <div class="psi-h" style="margin-top:12px">Predvoľby</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap" id="psi-presets">
+              ${PRESETS.map((p, i) => `<button type="button" class="psi-chip" data-p="${i}"><i style="background:${p.accent}"></i>${esc(p.name)}</button>`).join("")}
+            </div>
+            <div class="psi-btns">
+              <button type="button" class="DialogButton _DialogLayout Primary Focusable" id="psi-t-save">Použiť</button>
+              <button type="button" class="DialogButton _DialogLayout Secondary Focusable" id="psi-t-reset">Predvolené</button>
+            </div>
+            <div class="psi-mut" id="psi-t-msg" style="margin-top:6px">Náhľad sa mení hneď, do Steamu sa uloží tlačidlom Použiť.</div>
+          </div>
+          <div>
+            <div class="psi-mut" style="margin-bottom:6px">Náhľad okien</div>
+            <div id="psi-prev" class="psi-prev">
+              <i class="pv-blob" style="left:-30px;top:-20px;background:#ff7a59"></i><i class="pv-blob" style="right:-40px;top:40px;background:#7c3aed"></i>
+              <i class="pv-blob" style="left:90px;bottom:-60px;background:#22d3ee"></i>
+              <div class="pv-bar"><span>STORE</span><span class="pv-on">LIBRARY</span><span>COMMUNITY</span></div>
+              <div class="pv-win">
+                <div class="pv-hero"></div>
+                <div class="pv-row"><button class="pv-play">▶ Hrať</button><span>PROTONDB<br><b>Gold</b></span><span>ČAS HRANIA<br><b>35 h</b></span></div>
+                <div class="pv-card"><b>O HRE</b><span>Beží perfektne po menšej úprave…</span><em>≈ 80 FPS</em></div>
+              </div>
+              <div class="pv-side"><div class="pv-item pv-sel">Elden Ring</div><div class="pv-item">Rust</div><div class="pv-item">Terraria</div></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="psi-card">
@@ -256,6 +329,38 @@
         </div>
       </div>
       <div class="psi-mut">PSI · lokálna služba na tomto PC · dáta v ~/.local/share/psi</div>`;
+
+    /* ---- editor témy ---- */
+    const tcur = {...theme};
+    const fmt = {opacity: v => Math.round((1 - v) * 100) + " %", blur: v => v + " px", radius: v => v + " px"};
+    const prev = body.querySelector("#psi-prev");
+    const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) || 0).join(",");
+    const paint = () => {
+      const P = `rgba(${rgb(tcur.panel)},${tcur.opacity})`;
+      prev.style.setProperty("--a", tcur.accent); prev.style.setProperty("--p", P);
+      prev.style.setProperty("--b", tcur.blur + "px"); prev.style.setProperty("--r", tcur.radius + "px");
+      body.querySelectorAll("[data-t]").forEach(i => { i.value = tcur[i.dataset.t]; });
+      body.querySelectorAll("[data-hex]").forEach(i => { if (doc.activeElement !== i) i.value = tcur[i.dataset.hex]; });
+      body.querySelectorAll("[data-v]").forEach(b => { b.textContent = fmt[b.dataset.v](+tcur[b.dataset.v]); });
+    };
+    body.querySelectorAll("[data-t]").forEach(i => i.addEventListener("input", () => {
+      tcur[i.dataset.t] = i.type === "range" ? +i.value : i.value; paint();
+    }));
+    body.querySelectorAll("[data-hex]").forEach(i => i.addEventListener("input", () => {
+      if (/^#[0-9a-fA-F]{6}$/.test(i.value)) { tcur[i.dataset.hex] = i.value.toLowerCase(); paint(); }
+    }));
+    body.querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => { const {name, ...t} = PRESETS[+b.dataset.p]; Object.assign(tcur, t); paint(); }));
+    const tmsg = body.querySelector("#psi-t-msg");
+    const saveTheme = async t => {
+      try {
+        const saved = await call("set_theme", {theme: t});
+        Object.assign(tcur, saved); setTheme(saved); scan(); paint();
+        tmsg.textContent = "Téma použitá v celom Steame.";
+      } catch (e) { tmsg.textContent = "Chyba: " + e.message; }
+    };
+    body.querySelector("#psi-t-save").addEventListener("click", () => saveTheme(tcur));
+    body.querySelector("#psi-t-reset").addEventListener("click", () => { const {name, ...t} = PRESETS[0]; Object.assign(tcur, t); saveTheme(tcur); });
+    paint();
 
     const fsel = body.querySelector("#psi-font-sel"), fmsg = body.querySelector("#psi-font-msg"), fprev = body.querySelector("#psi-font-prev");
     fprev.style.fontFamily = fsel.value ? `"${fsel.value}"` : "";
@@ -542,12 +647,48 @@
   img[src*="library_hero."]:not([src*="blur"]){-webkit-mask-image:linear-gradient(to bottom,#000 40%,rgba(0,0,0,.6) 62%,transparent 84%);mask-image:linear-gradient(to bottom,#000 40%,rgba(0,0,0,.6) 62%,transparent 84%)}
   #psi-settings .psi-card{border-radius:12px}
   `;
+  /* ---------------- vlastná téma (Nastavenia → PSI → Vzhľad) ---------------- */
+  function psiThemeCss(t, where) {
+    const rgb = h => [1, 3, 5].map(i => parseInt(String(h).slice(i, i + 2), 16) || 0).join(",");
+    const P = `rgba(${rgb(t.panel)},${t.opacity})`, A = t.accent, B = `${t.blur}px`, R = `${t.radius}px`;
+    const glass = `background:${P}!important;backdrop-filter:blur(${B})!important;-webkit-backdrop-filter:blur(${B})!important;border-radius:${R}!important`;
+    const vars = `:root{--psi-accent:${A};--psi-panel:${P};--psi-blur:${B};--psi-radius:${R}}`;
+    if (where === "web") return vars + `
+  .game_area_purchase_game,.rightcol .block,.leftcol .block,.queue_ctn,.review_box,.user_reviews_summary_bar,.game_area_dlc_section,
+  .dlc_page_purchase_dlc_list_block,.game_meta_data .block,.franchise_notice,.DRM_notice,.game_area_already_owned,.early_access_banner,
+  .profile_customization{${glass}}
+  #game_highlights::before{background:${P}!important;backdrop-filter:blur(${B})!important;border-radius:calc(${R} + 8px)!important}
+  :has(> [role="navigation"][aria-label="Store menu"]){background:rgba(${rgb(t.panel)},${Math.max(0.12, t.opacity - 0.2)})!important;
+    backdrop-filter:blur(calc(${B} + 6px)) saturate(1.3)!important;border-radius:calc(${R} + 2px)!important}
+  form[role="search"]{border-radius:${R}!important}
+  form[role="search"] button,[role="navigation"][aria-label="Store menu"] a[href*="/cart"],.btn_blue_steamui,.btnv6_blue_blue_innerfade{background:${A}!important}`;
+    return vars + `
+  .psi-libcard{${glass};border:1px solid rgba(255,255,255,.04)!important}
+  .psi-pcard{border-radius:calc(${R} - 2px)!important}
+  #psi-settings .psi-card{${glass}}
+  #psi-settings .psi-sw.on{background:${A}!important;box-shadow:0 0 12px ${A}66!important}
+  .DialogButton.Primary,._3ydigb6zZAjJ0JCDgHwSYA,._2Szzh5sKyGgnLUR870zbDE._5wILZhsLODVwGfcJ0hKmJ{background:${A}!important}
+  ._1FnJ6dPuknQFQ2RTpKTI16,._2r4TK4BAuU-J4FuF_O7v_5{border-radius:${R}!important}`;
+  }
+
   const FEAT = {rounded: true, library: true};
-  async function refreshFeatures() { try { Object.assign(FEAT, await call("features")); } catch (e) {} try { await refreshFont(); } catch (e) {} }
+  const THEME = {accent: "#1a9fff", panel: "#121c2c", opacity: 0.62, blur: 10, radius: 12};
+  let THEME_CSS = psiThemeCss(THEME, "client");
+  function setTheme(t) { Object.assign(THEME, t || {}); THEME_CSS = psiThemeCss(THEME, "client"); }
+  async function refreshFeatures() {
+    try { Object.assign(FEAT, await call("features")); } catch (e) {}
+    try { setTheme(await call("theme")); } catch (e) {}
+    try { await refreshFont(); } catch (e) {}
+  }
   function applyRounded(doc) {
-    const ex = doc.getElementById("psi-round");
-    if (FEAT.rounded && !ex) { const st = doc.createElement("style"); st.id = "psi-round"; st.textContent = ROUND_CSS; (doc.head || doc.documentElement).appendChild(st); }
-    else if (!FEAT.rounded && ex) ex.remove();
+    const put = (id, css) => {
+      let st = doc.getElementById(id);
+      if (!css) { st && st.remove(); return; }
+      if (!st) { st = doc.createElement("style"); st.id = id; (doc.head || doc.documentElement).appendChild(st); }
+      if (st.textContent !== css) st.textContent = css;
+    };
+    put("psi-round", FEAT.rounded ? ROUND_CSS : "");
+    put("psi-theme", FEAT.rounded ? THEME_CSS : "");
   }
 
 
@@ -625,7 +766,7 @@
         const visible = MEDIA.test(e.tagName) || (bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") ||
           cs.backgroundImage !== "none" || parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0 || cs.boxShadow !== "none";
         if (!visible) continue;
-        const rad = Math.min(12, Math.max(4, Math.round(Math.min(r.width, r.height) / 4)));
+        const rad = Math.min(+THEME.radius || 12, Math.max(4, Math.round(Math.min(r.width, r.height) / 4)));
         e.style.setProperty("border-radius", rad + "px");
       }
     };
@@ -669,12 +810,12 @@
     } catch (e) { /* Steam UI sa mení – skúsime znova */ }
   }
   let active = true;
-  try { window.g_PopupManager && window.g_PopupManager.AddPopupCreatedCallback && window.g_PopupManager.AddPopupCreatedCallback(() => active && setTimeout(scan, 300)); } catch (e) {}
+  try { window.g_PopupManager && window.g_PopupManager.AddPopupCreatedCallback && window.g_PopupManager.AddPopupCreatedCallback(() => { if (active) { setTimeout(scan, 0); setTimeout(scan, 120); } }); } catch (e) {}
   refreshFeatures().then(() => { scan(); setTimeout(() => syncCollections(true), 5000); });
   const colTimer = setInterval(() => syncCollections(), 15 * 60e3);
   const featTimer = setInterval(refreshFeatures, 4000);
-  const timer = setInterval(scan, 1500);
-  const libTimer = setInterval(libraryTick, 700);
+  const timer = setInterval(scan, 1000);
+  const libTimer = setInterval(libraryTick, 350);
   window.__psiCleanup = () => {
     active = false;
     clearInterval(timer);
@@ -686,7 +827,7 @@
       if (!doc) continue;
       const panel = doc.getElementById("psi-settings");
       if (panel) { [...panel.parentElement.children].forEach(ch => { ch.style.display = ""; }); panel.remove(); }
-      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
+      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
       doc.querySelectorAll(".psi-lib, .psi-libcard").forEach(e => e.remove());
     }
   };

@@ -155,7 +155,10 @@ class Session:
                         slot[0].set()
                 elif "method" in msg:
                     try:
-                        self.on_event(self, msg["method"], msg.get("params", {}))
+                        params = msg.get("params", {})
+                        if msg.get("sessionId"):
+                            params = {**params, "__sid": msg["sessionId"]}
+                        self.on_event(self, msg["method"], params)
                     except Exception:
                         log.exception("CDP event handler")
         except (OSError, ConnectionError, ValueError) as e:
@@ -167,23 +170,37 @@ class Session:
                     slot[0].set()
                 self._pending.clear()
 
-    def call(self, method: str, params: dict | None = None, timeout: float = 10) -> dict:
+    def call(self, method: str, params: dict | None = None, timeout: float = 10, session_id: str | None = None) -> dict:
         mid = next(self._ids)
         slot = [threading.Event(), None]
         with self._plock:
             self._pending[mid] = slot
-        self.ws.send(json.dumps({"id": mid, "method": method, "params": params or {}}))
+        msg = {"id": mid, "method": method, "params": params or {}}
+        if session_id:
+            msg["sessionId"] = session_id
+        self.ws.send(json.dumps(msg))
         if not slot[0].wait(timeout) or slot[1] is None:
             raise TimeoutError(method)
         if "error" in slot[1]:
             raise RuntimeError(f"{method}: {slot[1]['error'].get('message')}")
         return slot[1].get("result", {})
 
-    def notify(self, method: str, params: dict | None = None) -> None:
+    def notify(self, method: str, params: dict | None = None, session_id: str | None = None) -> None:
         """Bez čakania na odpoveď (napr. odoslanie výsledku do stránky)."""
         mid = next(self._ids)
-        self.ws.send(json.dumps({"id": mid, "method": method, "params": params or {}}))
+        msg = {"id": mid, "method": method, "params": params or {}}
+        if session_id:
+            msg["sessionId"] = session_id
+        self.ws.send(json.dumps(msg))
+
 
     def close(self) -> None:
         self.alive = False
         self.ws.close()
+
+
+def browser_ws(timeout: float = 3) -> str | None:
+    """WebSocket celého prehliadača Steamu (pre okamžité pripojenie k novým stránkam)."""
+    list_targets(timeout)  # nastaví CEF na fungujúcu adresu (IPv4/IPv6)
+    with urllib.request.urlopen(CEF + "/json/version", timeout=timeout) as r:
+        return json.loads(r.read().decode()).get("webSocketDebuggerUrl")

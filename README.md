@@ -26,6 +26,8 @@ journalctl --user -u psi -f
 - **Knižnica:** ProtonDB medaila pri hre, rozbaľovacie „O hre“ (popis, Linux/anti-cheat/Steam Deck, odhad FPS), auto-kolekcie „PSI · Gold / Natívne / Online nepôjde…“.
 - **Obchod:** „Hrať na Linuxe“ (prečo Gold, anti-cheat z AreWeAntiCheatYet), „Výkon na tvojom PC“ (odhad FPS), „Cena a zľava“ (kúp/počkaj), varovanie pred kúpou, odznaky na wishliste.
 - **Moderný vzhľad:** zaoblené rohy všade, sklenené panely, miznúci obrázok hry; vlastné písmo (systémové alebo nahrané).
+- **Editor témy:** akcentová farba, farba a priehľadnosť panelov, rozmazanie, zaoblenie, predvoľby a živý náhľad okien.
+- **Okamžité načítanie:** PSI sa pripojí ku každej stránke obchodu v momente vzniku – štýly sú tam skôr, než sa vykreslí.
 - **Notifikácie v KDE** pri zľave hry z wishlistu.
 - **Profil:** vitrína „Môj týždeň“.
 

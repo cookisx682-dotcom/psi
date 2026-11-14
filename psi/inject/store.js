@@ -92,12 +92,6 @@
   [role="navigation"][aria-label="Store menu"],[role="navigation"][aria-label="Store menu"] > *{background-color:transparent!important}
   form[role="search"]{background:rgba(255,255,255,.08)!important}
   #game_highlights .game_header_image_full{border-radius:12px}`;
-  window.__psiCall("font_css").then(c => {
-    if (!c.family || document.getElementById("psi-font")) return;
-    const st = document.createElement("style"); st.id = "psi-font";
-    st.textContent = c.face + `*:not(svg):not(svg *):not(code):not(pre){font-family:"${c.family}","Motiva Sans",Arial,sans-serif!important}`;
-    (document.head || document.documentElement).appendChild(st);
-  }).catch(() => {});
   /* ---------------- automatické zaoblenie všetkého viditeľného ---------------- */
   // Každý prvok s pozadím, rámikom, tieňom alebo obrázok/tlačidlo dostane zaoblené rohy.
   // Preskočí: SVG, prvky cez celú šírku okna, malé ikonky a prvky, ktoré už zaoblené sú.
@@ -125,7 +119,7 @@
         const visible = MEDIA.test(e.tagName) || (bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") ||
           cs.backgroundImage !== "none" || parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0 || cs.boxShadow !== "none";
         if (!visible) continue;
-        const rad = Math.min(12, Math.max(4, Math.round(Math.min(r.width, r.height) / 4)));
+        const rad = Math.min(window.__psiRadius || 12, Math.max(4, Math.round(Math.min(r.width, r.height) / 4)));
         e.style.setProperty("border-radius", rad + "px");
       }
     };
@@ -134,14 +128,59 @@
     win.addEventListener("scroll", schedule, {passive: true});
     schedule();
   }
-  window.__psiCall("features").then(f => {
-    if (f.rounded === false || document.getElementById("psi-round")) return;
+  /* ---------------- vlastná téma (Nastavenia → PSI → Vzhľad) ---------------- */
+  function psiThemeCss(t, where) {
+    const rgb = h => [1, 3, 5].map(i => parseInt(String(h).slice(i, i + 2), 16) || 0).join(",");
+    const P = `rgba(${rgb(t.panel)},${t.opacity})`, A = t.accent, B = `${t.blur}px`, R = `${t.radius}px`;
+    const glass = `background:${P}!important;backdrop-filter:blur(${B})!important;-webkit-backdrop-filter:blur(${B})!important;border-radius:${R}!important`;
+    const vars = `:root{--psi-accent:${A};--psi-panel:${P};--psi-blur:${B};--psi-radius:${R}}`;
+    if (where === "web") return vars + `
+  .game_area_purchase_game,.rightcol .block,.leftcol .block,.queue_ctn,.review_box,.user_reviews_summary_bar,.game_area_dlc_section,
+  .dlc_page_purchase_dlc_list_block,.game_meta_data .block,.franchise_notice,.DRM_notice,.game_area_already_owned,.early_access_banner,
+  .profile_customization{${glass}}
+  #game_highlights::before{background:${P}!important;backdrop-filter:blur(${B})!important;border-radius:calc(${R} + 8px)!important}
+  :has(> [role="navigation"][aria-label="Store menu"]){background:rgba(${rgb(t.panel)},${Math.max(0.12, t.opacity - 0.2)})!important;
+    backdrop-filter:blur(calc(${B} + 6px)) saturate(1.3)!important;border-radius:calc(${R} + 2px)!important}
+  form[role="search"]{border-radius:${R}!important}
+  form[role="search"] button,[role="navigation"][aria-label="Store menu"] a[href*="/cart"],.btn_blue_steamui,.btnv6_blue_blue_innerfade{background:${A}!important}`;
+    return vars + `
+  .psi-libcard{${glass};border:1px solid rgba(255,255,255,.04)!important}
+  .psi-pcard{border-radius:calc(${R} - 2px)!important}
+  #psi-settings .psi-card{${glass}}
+  #psi-settings .psi-sw.on{background:${A}!important;box-shadow:0 0 12px ${A}66!important}
+  .DialogButton.Primary,._3ydigb6zZAjJ0JCDgHwSYA,._2Szzh5sKyGgnLUR870zbDE._5wILZhsLODVwGfcJ0hKmJ{background:${A}!important}
+  ._1FnJ6dPuknQFQ2RTpKTI16,._2r4TK4BAuU-J4FuF_O7v_5{border-radius:${R}!important}`;
+  }
+
+  /* štýl vložený čo najskôr – aj keď ešte neexistuje <head> */
+  function addStyle(id, css) {
+    const put = () => {
+      const ex = document.getElementById(id);
+      if (ex) { if (ex.textContent !== css) ex.textContent = css; return true; }
+      const root = document.head || document.documentElement;
+      if (!root) return false;
+      const st = document.createElement("style"); st.id = id; st.textContent = css; root.appendChild(st);
+      return true;
+    };
+    if (!put()) { const mo = new MutationObserver(() => { if (put()) mo.disconnect(); }); mo.observe(document, {childList: true, subtree: true}); }
+  }
+  window.__psiApplyTheme = t => { if (!t) return; window.__psiRadius = +t.radius || 12; addStyle("psi-theme", psiThemeCss(t, "web")); };
+  const applyFont = c => { if (c && c.family) addStyle("psi-font", c.face + `*:not(svg):not(svg *):not(code):not(pre){font-family:"${c.family}","Motiva Sans",Arial,sans-serif!important}`); };
+  const applyLook = (f, t) => {
+    if (f.rounded === false) return;
+    addStyle("psi-round", ROUND_WEB);
+    window.__psiApplyTheme(t);
     const startAuto = () => psiAutoRound(document, () => true);
     document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", startAuto) : startAuto();
-    const st = document.createElement("style"); st.id = "psi-round"; st.textContent = ROUND_WEB;
-    (document.head || document.documentElement).appendChild(st);
-  }).catch(() => {});
-
+  };
+  const BOOT = window.__PSI_BOOT || null;
+  if (BOOT) {                                   // okamžite – údaje vložila služba spolu so skriptom
+    applyLook(BOOT.features || {}, BOOT.theme || {});
+    applyFont(BOOT.font);
+  } else {                                      // záloha: cez most
+    Promise.all([window.__psiCall("features"), window.__psiCall("theme")]).then(([f, t]) => applyLook(f, t)).catch(() => {});
+    window.__psiCall("font_css").then(applyFont).catch(() => {});
+  }
 
   /* modálne okno „hra na Linuxe nemusí ísť“ – spoločné pre stránku hry aj wishlist */
   function psiBuyModal(reasons, onYes) {
@@ -365,18 +404,16 @@
 
   function mount() {
     const anchor = document.querySelector("#game_area_purchase") || document.querySelector(".game_area_purchase_game_wrapper");
-    if (!anchor) return setTimeout(mount, 600);
+    if (!anchor) return setTimeout(mount, 150);
     if (document.getElementById("psi-store")) return;
     const box = document.createElement("div");
     box.id = "psi-store";
     box.innerHTML = `<div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game"><h1>Hrať na Linuxe</h1><div style="color:#8f98a0">Načítavam…</div></div></div>`;
     anchor.parentNode.insertBefore(box, anchor);
-    Promise.all([window.__psiCall("linux", {appid}), window.__psiCall("deal", {appid}), window.__psiCall("features"),
-                 window.__psiCall("perf", {appid}).catch(() => null)]).then(([info, d, feats, perf]) => {
+    const feats = BOOT ? Promise.resolve(BOOT.features || {}) : window.__psiCall("features").catch(() => ({}));
+    Promise.all([window.__psiCall("linux", {appid}), feats, window.__psiCall("perf", {appid}).catch(() => null)]).then(([info, feats, perf]) => {
       const warn = feats.buy_warning !== false ? buyGuard(info) : null;
       const t = TIERS[info.native ? "native" : (info.protondb || {}).tier] || TIERS.pending;
-      const verdict = {buy: ["Kúp teraz", "#a4d007", "#1b2838"], wait: ["Počkaj", "#e5a83a", "#1b2838"], info: ["Info", "#8f98a0", "#1b2838"]}[d.verdict] || ["", "#8f98a0", "#1b2838"];
-      const stat = (big, small) => `<div style="min-width:110px"><div style="font-size:18px;color:#fff">${big}</div><div style="font-size:12px;color:#8f98a0">${small}</div></div>`;
       box.innerHTML = `
         <div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game" style="padding-bottom:18px">
           <h1>Hrať na Linuxe – ${esc(t.label)}</h1>
@@ -390,7 +427,16 @@
           <h1>Výkon na tvojom PC</h1>
           <div style="margin-top:8px;color:#c6d4df;font-size:14px">${perfHtml(perf)}</div>
         </div></div>
-        <div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game" style="padding-bottom:18px">
+        <div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game psi-price" style="padding-bottom:18px">
+          <h1>Cena a zľava</h1><div style="color:#8f98a0;margin-top:6px">Načítavam ceny…</div>
+        </div></div>`;
+      const link = box.querySelector(".psi-pdb");
+      link && link.addEventListener("click", () => window.open(`https://www.protondb.com/app/${appid}`, "_blank"));
+      // cena môže trvať dlhšie (CheapShark) – doplní sa, keď príde
+      window.__psiCall("deal", {appid}).then(d => {
+        const verdict = {buy: ["Kúp teraz", "#a4d007", "#1b2838"], wait: ["Počkaj", "#e5a83a", "#1b2838"], info: ["Info", "#8f98a0", "#1b2838"]}[d.verdict] || ["", "#8f98a0", "#1b2838"];
+        const stat = (big, small) => `<div style="min-width:110px"><div style="font-size:18px;color:#fff">${big}</div><div style="font-size:12px;color:#8f98a0">${small}</div></div>`;
+        box.querySelector(".psi-price").innerHTML = `
           <h1>Cena a zľava</h1>
           <div style="display:flex;gap:26px;flex-wrap:wrap;margin:8px 0 12px">
             ${d.on_sale ? stat(`−${d.discount} %`, d.ends ? `končí o <span data-psi-end="${d.ends}">${cd(d.ends)}</span>` : "aktuálna zľava")
@@ -399,16 +445,15 @@
             ${d.next_sale ? stat(d.next_sale.active ? "práve teraz" : `o ${Math.ceil(d.next_sale.days)} dní`, esc(d.next_sale.name)) : ""}
           </div>
           <div style="display:flex;gap:10px;align-items:center;color:#c6d4df;font-size:14px">
-            <span style="flex:none;background:${verdict[1]};color:${verdict[2]};font-size:12px;font-weight:700;text-transform:uppercase;padding:3px 9px;border-radius:2px">${verdict[0]}</span>
+            <span style="flex:none;background:${verdict[1]};color:${verdict[2]};font-size:12px;font-weight:700;text-transform:uppercase;padding:3px 9px;border-radius:6px">${verdict[0]}</span>
             <span>${esc(d.reason)}</span>
           </div>
-          <div style="margin-top:12px;font-size:11px;color:#56707f">Údaje: ProtonDB, AreWeAntiCheatYet, Steam, CheapShark · PSI</div>
-        </div></div>`;
-      const link = box.querySelector(".psi-pdb");
-      link && link.addEventListener("click", () => window.open(`https://www.protondb.com/app/${appid}`, "_blank"));
+          <div style="margin-top:12px;font-size:11px;color:#56707f">Údaje: ProtonDB, AreWeAntiCheatYet, Steam, CheapShark · PSI</div>`;
+      }).catch(() => { const p = box.querySelector(".psi-price"); p && p.parentElement.remove(); });
       setInterval(() => box.querySelectorAll("[data-psi-end]").forEach(el => el.textContent = cd(+el.dataset.psiEnd)), 1000);
     }).catch(() => box.remove());
   }
-  const start = () => window.__psiCall("features").then(f => f.store !== false && mount()).catch(mount);
+  const start = () => BOOT ? (BOOT.features.store !== false && mount())
+    : window.__psiCall("features").then(f => f.store !== false && mount()).catch(mount);
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", start) : start();
 })();
