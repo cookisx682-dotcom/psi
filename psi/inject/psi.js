@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.58";
+  const VERSION = "1.59";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -702,6 +702,19 @@
   ._1FnJ6dPuknQFQ2RTpKTI16 > :last-child:not(:only-child){border-radius:0 10px 10px 0!important;border-left:1px solid rgba(0,0,0,.25)!important;filter:brightness(.9)}
   ._2r4TK4BAuU-J4FuF_O7v_5{border-radius:10px;overflow:hidden}
   ._3qDWQGB0rtwM3qpXTb11Q-{border-radius:8px}
+  /* riadok záložiek v knižnici (Store Page / DLC / …): border-image ignoruje zaoblenie → nahradíme */
+  ._31ptFGGMZrSQc5BCX1e5lm{border-image:none!important;border-radius:var(--psi-radius,12px)!important;overflow:hidden}
+  ._1b6LYWVijW-9E4YV0keDWZ{border-radius:8px!important}
+  ._2sNDjgK9EWiPLdNGkjun-w{color:rgba(255,255,255,.66)!important;font-weight:500!important}
+  ._1b6LYWVijW-9E4YV0keDWZ:hover ._2sNDjgK9EWiPLdNGkjun-w{color:#fff!important}
+  /* dialógy Steamu (napr. Anonymous framerate data) */
+  .v66w8s0IBeRURM9hD5nAw{border-image:none!important;border:1px solid color-mix(in srgb,var(--psi-accent,#1a9fff) 30%,transparent)!important;border-radius:var(--psi-radius,12px)!important;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.55)!important}
+  ._2T8UwmbZ9jJzntqjQU4czU{color:#fff!important;font-weight:400!important}
+  ._2d9pc_ziCjBFV-KGQ-nsCh{color:#bfc6cd!important}
+  /* tlačidlo Scroll to top – pilulka v farbe témy */
+  ._1J21tLst5SEhBPkVRT53UV{overflow:visible!important}
+  ._1J21tLst5SEhBPkVRT53UV > div{background:color-mix(in srgb,var(--psi-accent,#1a9fff) 78%,var(--psi-bg2,#23272e))!important;color:#fff!important;border-radius:99px!important;box-shadow:0 4px 14px rgba(0,0,0,.35)!important;font-weight:600!important;margin-bottom:6px!important;transition:filter .15s}
+  ._1J21tLst5SEhBPkVRT53UV > div:hover{filter:brightness(1.12)}
   .psi-libcard{border-radius:12px!important}.psi-pcard{border-radius:10px!important}
   /* jednotné farby celého okna odvodené z témy (lišta, spodok, ľavý panel, stránky knižnice) */
   /* svetlejšia modrá: hlavná plocha (bg) a o odtieň tmavší rám – ľavý panel, lišta, spodok (bg2) */
