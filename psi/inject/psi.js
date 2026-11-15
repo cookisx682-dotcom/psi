@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.41";
+  const VERSION = "1.42";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -978,6 +978,35 @@
     if (info.innerHTML !== html) info.innerHTML = html;
   }
 
+
+  /* poistka: Steam na Linuxe po obnovení okna niekedy nechá vnútro okna malé (napr. 600×113)
+     a hlavný kontajner posunutý – zvyšok okna je čierny. PSI to samo opraví. */
+  let fixingWindow = false;
+  async function windowWatchdog() {
+    const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
+    const w = pop && pop.m_popup;
+    if (!w || fixingWindow || w.document.hidden) return;
+    const tooSmall = w.outerHeight > 300 && w.innerHeight < w.outerHeight * 0.6;
+    if (tooSmall) {
+      fixingWindow = true;
+      try {
+        const sw = (w.SteamClient && w.SteamClient.Window) || SteamClient.Window;
+        const W = w.outerWidth, H = w.outerHeight;
+        sw.ResizeTo(W - 60, H - 60, true);
+        await new Promise(r => setTimeout(r, 900));
+        sw.ResizeTo(W, H, true);
+        await new Promise(r => setTimeout(r, 600));
+      } catch (e) {}
+      fixingWindow = false;
+    }
+    // hlavné rozloženie sa nemá posúvať – ak je posunuté, vrátime ho
+    for (const e of w.document.querySelectorAll("body > div, body > div > div, body > div > div > div")) {
+      if (!e.scrollTop) continue;
+      const r = e.getBoundingClientRect();
+      if (r.width > w.innerWidth * 0.9 && r.height > w.innerHeight * 0.6) e.scrollTop = 0;
+    }
+  }
+
   /* ---------------- vlastné písmo ---------------- */
   const FONT = {key: null, css: ""};
   async function refreshFont() {
@@ -1021,6 +1050,7 @@
   const timer = setInterval(scan, 1000);
   const libTimer = setInterval(libraryTick, 350);
   const extraTimer = setInterval(() => { try { libraryExtras(); } catch (e) {} try { downloadsExtras(); } catch (e) {} }, 800);
+  const wdTimer = setInterval(() => { windowWatchdog().catch(() => {}); }, 2000);
   window.__psiCleanup = () => {
     active = false;
     clearInterval(timer);
@@ -1029,6 +1059,7 @@
     clearInterval(libExportTimer);
     clearInterval(libTimer);
     clearInterval(extraTimer);
+    clearInterval(wdTimer);
     for (const p of (window.g_PopupManager && g_PopupManager.m_mapPopups ? g_PopupManager.m_mapPopups.values() : [])) {
       const doc = p.m_popup && p.m_popup.document;
       if (!doc) continue;
