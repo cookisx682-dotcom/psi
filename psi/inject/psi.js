@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.50";
+  const VERSION = "1.53";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -701,8 +701,16 @@
   ._3qDWQGB0rtwM3qpXTb11Q-{border-radius:8px}
   .psi-libcard{border-radius:12px!important}.psi-pcard{border-radius:10px!important}
   /* jednotné farby celého okna odvodené z témy (lišta, spodok, ľavý panel, stránky knižnice) */
-  :root{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 72%,#1c2533);--psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 80%,#222c3b)}
-  ._3Z7VQ1IMk4E3HsHvrkLNgo,._3vCzSrrXZzZjVJFZNg9SGu{background:var(--psi-bg)!important}
+  /* svetlejšia modrá: hlavná plocha (bg) a o odtieň tmavší rám – ľavý panel, lišta, spodok (bg2) */
+  :root{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 52%,#2b4568);--psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 64%,#223858);
+    --psi-ctl:color-mix(in srgb,var(--psi-bg2) 70%,#ffffff 12%)}
+  ._3Z7VQ1IMk4E3HsHvrkLNgo,._3vCzSrrXZzZjVJFZNg9SGu{background:var(--psi-bg2)!important}
+  /* ovládacie prvky v ľavom paneli: Home, Games and Software, vyhľadávanie – viditeľne oddelené */
+  ._3pSPluBgf0NeR1kkCLWMhR,._2WgQEFvIzJw_SHNGbjtRFU,._20QAC4WMXm8qFE8waUT5oo{
+    background:var(--psi-ctl)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)!important;border-radius:8px!important}
+  ._12vo5L1hsNGdao6_ssuirS,._3x1HklzyDs4TEjACrRO2tB .DialogInput_Wrapper{background-color:transparent!important;box-shadow:none!important}
+  ._3pSPluBgf0NeR1kkCLWMhR:hover,._2WgQEFvIzJw_SHNGbjtRFU:hover{background:color-mix(in srgb,var(--psi-ctl) 80%,#ffffff 12%)!important}
+  ._3x1HklzyDs4TEjACrRO2tB .DialogInput,._3x1HklzyDs4TEjACrRO2tB input{background-color:transparent!important}
   ._3x1HklzyDs4TEjACrRO2tB{background:var(--psi-bg2)!important}
   /* hlavičky kategórií v ľavom zozname: bez vlastného pozadia, len jemná deliaca čiara */
   ._2sYIghGVXJr6tsQVvcryy8{background:transparent!important;border-radius:0!important;box-shadow:inset 0 -1px 0 rgba(255,255,255,.05)!important}
