@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.54";
+  const VERSION = "1.56";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -706,7 +706,7 @@
     --psi-ctl:color-mix(in srgb,var(--psi-bg2) 70%,#ffffff 12%)}
   ._3Z7VQ1IMk4E3HsHvrkLNgo,._3vCzSrrXZzZjVJFZNg9SGu{background:var(--psi-bg2)!important;box-shadow:none!important}
   /* prechod lišta → obsah bez sivých čiar a pôvodných farieb Steamu */
-  ._2TKEazUUS3TlniZfpc8OOe{background:var(--psi-bg2)!important;box-shadow:none!important}
+  ._2TKEazUUS3TlniZfpc8OOe,._2CmrnGY-Amtd83ScJkFvx2{background:var(--psi-bg2)!important;box-shadow:none!important;border:0!important}
   ._2Nq6ov7A1hGcHXVOXNt_OE{border-top-color:transparent!important}
   ._3fLo166MlaNqP8r8tTyRz{background-image:linear-gradient(to top,transparent 0%,var(--psi-bg2) 100%)!important}
   /* ovládacie prvky v ľavom paneli: Home, Games and Software, vyhľadávanie – viditeľne oddelené */
@@ -733,8 +733,8 @@
   /* obrázok hry: vyšší, pokračuje za lištou s tlačidlom a dlho, plynulo mizne */
   /* obrázok hry: dlho celý, potom mäkko (ease-out) zmizne – bez fade do strán */
   img.HNbe3eZf6H7dtJ042x1vM[src*="library_hero."]:not([src*="blur"]){
-    -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.92) 0%,#000 4%,#000 46%,rgba(0,0,0,.9) 55%,rgba(0,0,0,.72) 64%,rgba(0,0,0,.5) 73%,rgba(0,0,0,.3) 82%,rgba(0,0,0,.13) 91%,transparent 100%)!important;
-    mask-image:linear-gradient(to bottom,rgba(0,0,0,.92) 0%,#000 4%,#000 46%,rgba(0,0,0,.9) 55%,rgba(0,0,0,.72) 64%,rgba(0,0,0,.5) 73%,rgba(0,0,0,.3) 82%,rgba(0,0,0,.13) 91%,transparent 100%)!important}
+    -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.3) 0%,rgba(0,0,0,.75) 3%,#000 7%,#000 46%,rgba(0,0,0,.9) 55%,rgba(0,0,0,.72) 64%,rgba(0,0,0,.5) 73%,rgba(0,0,0,.3) 82%,rgba(0,0,0,.13) 91%,transparent 100%)!important;
+    mask-image:linear-gradient(to bottom,rgba(0,0,0,.3) 0%,rgba(0,0,0,.75) 3%,#000 7%,#000 46%,rgba(0,0,0,.9) 55%,rgba(0,0,0,.72) 64%,rgba(0,0,0,.5) 73%,rgba(0,0,0,.3) 82%,rgba(0,0,0,.13) 91%,transparent 100%)!important}
   /* rozmazaná kópia za obrázkom: tlmenejšia, aby nefarbila stránku */
   img[src*="library_hero_blur"]:not([class*="_3_IUV"]){opacity:.5!important}
   /* bez sivého pásu a čiary pod obrázkom (len hlavná lišta, nie lepkavá hlavička pri posúvaní) */
