@@ -402,6 +402,21 @@ class Psi:
         subprocess.Popen(["xdg-open", str(mi.THEMES_DIR)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"ok": True}
 
+    # ------------------------------------------------------------------ vlastné CSS
+    def custom_css(self) -> dict:
+        return {"css": str(config().get("custom_css") or "")}
+
+    def set_custom_css(self, css: str) -> dict:
+        css = str(css or "")[:200_000]
+        CONFIG.update(lambda c: c.__setitem__("custom_css", css))
+        self._changed()
+        for fn in list(self.theme_listeners):     # okamžite aj do otvorených stránok obchodu
+            try:
+                fn(core.theme())
+            except Exception:
+                pass
+        return {"css": css}
+
     def theme(self) -> dict:
         return core.theme()
 
@@ -430,8 +445,9 @@ BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
                "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme", "disk", "save_library",
-               "millennium", "millennium_set", "millennium_patches", "millennium_install", "millennium_open"},
-    "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme"},
+               "millennium", "millennium_set", "millennium_patches", "millennium_install", "millennium_open",
+               "custom_css", "set_custom_css"},
+    "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme", "custom_css"},
 }
 
 
@@ -469,7 +485,7 @@ class Injector(threading.Thread):
         body = "\n;\n".join((INJECT / f).read_text(encoding="utf-8") for f in files)
         if kind == "web":
             # štýly sa aplikujú synchrónne hneď na začiatku stránky – bez čakania na most
-            boot = {"features": core.features(), "theme": core.theme()}
+            boot = {"features": core.features(), "theme": core.theme(), "custom_css": str(config().get("custom_css") or "")}
             try:
                 from . import millennium as mi
                 boot["millennium"] = mi.patches("web")
@@ -559,6 +575,8 @@ class Injector(threading.Thread):
                 result = fn(str(args.get("family", "")))
             elif method == "upload_font":
                 result = fn(str(args.get("name", "")), str(args.get("data", "")))
+            elif method == "set_custom_css":
+                result = fn(str(args.get("css", "")))
             elif method == "millennium_set":
                 result = fn(str(args.get("id", "")))
             elif method == "millennium_install":

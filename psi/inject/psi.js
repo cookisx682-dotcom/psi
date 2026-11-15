@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.46";
+  const VERSION = "1.48";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -243,10 +243,10 @@
   async function renderInner(doc) {
     const body = doc.getElementById("psi-body");
     if (!body) return;
-    let c, q, f, fonts, theme, mill;
+    let c, q, f, fonts, theme, mill, custom;
     try {
-      [c, q, f, fonts, theme, mill] = await Promise.all([call("companion_info"), call("companion_qr"), call("features"), call("fonts"), call("theme"),
-        call("millennium").catch(() => ({themes: [], current: ""}))]);
+      [c, q, f, fonts, theme, mill, custom] = await Promise.all([call("companion_info"), call("companion_qr"), call("features"), call("fonts"), call("theme"),
+        call("millennium").catch(() => ({themes: [], current: ""})), call("custom_css").catch(() => ({css: ""}))]);
     } catch (e) {
       body.innerHTML = `<div class="psi-card psi-err">PSI služba neodpovedá: ${esc(e.message)}<br><span class="psi-mut">Skontroluj: systemctl --user status psi</span></div>`;
       return;
@@ -297,6 +297,18 @@
         </div>
       </div>
 
+
+
+      <div class="psi-card">
+        <div class="psi-h">Vlastné CSS · bez obmedzení</div>
+        <textarea id="psi-css" spellcheck="false" placeholder="/* napr. */&#10;.DialogButton { border-radius: 20px !important; }&#10;body { letter-spacing: .2px; }"
+          style="width:100%;min-height:150px;box-sizing:border-box;border:0;border-radius:10px;background:#0f141c;color:#d6e2ff;padding:10px 12px;font:13px/1.5 monospace;resize:vertical">${esc(custom.css || "")}</textarea>
+        <div class="psi-btns">
+          <button type="button" class="DialogButton _DialogLayout Primary Focusable" id="psi-css-save">Použiť</button>
+          <button type="button" class="DialogButton _DialogLayout Secondary Focusable" id="psi-css-clear">Vymazať</button>
+        </div>
+        <div class="psi-mut" id="psi-css-msg" style="margin-top:6px">Platí v celom Steame (klient aj obchod) a má prednosť pred PSI aj Millennium témou.</div>
+      </div>
 
       <div class="psi-card">
         <div class="psi-h">Millennium témy (steambrew.app)</div>
@@ -349,6 +361,16 @@
         </div>
       </div>
       <div class="psi-mut">PSI · lokálna služba na tomto PC · dáta v ~/.local/share/psi</div>`;
+
+    /* ---- vlastné CSS ---- */
+    const cmsg = body.querySelector("#psi-css-msg"), cta = body.querySelector("#psi-css");
+    const saveCss = async css => {
+      try { await call("set_custom_css", {css}); CUSTOM_CSS = css; scan(); cmsg.textContent = css ? "Vlastné CSS použité v celom Steame." : "Vlastné CSS vymazané."; }
+      catch (e) { cmsg.textContent = "Chyba: " + e.message; }
+    };
+    body.querySelector("#psi-css-save").addEventListener("click", () => saveCss(cta.value));
+    body.querySelector("#psi-css-clear").addEventListener("click", () => { cta.value = ""; saveCss(""); });
+    cta.addEventListener("keydown", e => { if (e.key === "Tab") { e.preventDefault(); const p = cta.selectionStart; cta.setRangeText("  ", p, cta.selectionEnd, "end"); } e.stopPropagation(); });
 
     /* ---- Millennium ---- */
     const mmsg = body.querySelector("#psi-mill-msg");
@@ -678,8 +700,16 @@
   ._2r4TK4BAuU-J4FuF_O7v_5{border-radius:10px;overflow:hidden}
   ._3qDWQGB0rtwM3qpXTb11Q-{border-radius:8px}
   .psi-libcard{border-radius:12px!important}.psi-pcard{border-radius:10px!important}
-  /* menu sú nepriehľadné okná – okno nezaobľujeme (čierne rohy), len zvýraznenie položiek */
-  .ContextMenuPopupBody .contextMenuItem{border-radius:6px;margin:0 4px}
+  /* jednotné farby celého okna odvodené z témy (lišta, spodok, ľavý panel, stránky knižnice) */
+  :root{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 55%,#05080d);--psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 72%,#0a0f16)}
+  ._3Z7VQ1IMk4E3HsHvrkLNgo,._3vCzSrrXZzZjVJFZNg9SGu{background:var(--psi-bg)!important}
+  ._3x1HklzyDs4TEjACrRO2tB{background:var(--psi-bg2)!important}
+  ._3lDczhulqraStjCitLYJ1K,._2Dd4T78PcCTUVgOtDGFY5j{background:var(--psi-bg)!important}
+  /* menu: okno nezaobľujeme (je nepriehľadné → čierne rohy); tón panelov, zvýraznenie vo farbe akcentu */
+  .ContextMenuPopupBody #popup_target > div,.ContextMenuPopupBody #popup_target > div > div{background:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 82%,#ffffff 8%)!important}
+  .ContextMenuPopupBody .contextMenuItem{border-radius:8px;margin:2px 5px;background:transparent!important}
+  .ContextMenuPopupBody .contextMenuItem:hover,.ContextMenuPopupBody .contextMenuItem:focus,.ContextMenuPopupBody .contextMenuItem.active{
+    background:color-mix(in srgb,var(--psi-accent,#1a9fff) 38%,transparent)!important;color:#fff!important}
   .PageListColumn [role="tab"]{border-radius:8px}
   ._3pSPluBgf0NeR1kkCLWMhR,._2WgQEFvIzJw_SHNGbjtRFU,._12vo5L1hsNGdao6_ssuirS,.DialogInput_Wrapper{border-radius:8px;overflow:hidden}
   ._2-O4ZG0KrnSrzISHBKctFQ{border-radius:6px}
@@ -687,8 +717,10 @@
   ._3yD46y5pd3zOGR7CzKs0mC{border-radius:8px!important;overflow:hidden}
   /* obrázok hry: vyšší, pokračuje za lištou s tlačidlom a dlho, plynulo mizne */
   img.HNbe3eZf6H7dtJ042x1vM[src*="library_hero."]:not([src*="blur"]){
-    -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,#000 4%,#000 18%,rgba(0,0,0,.82) 32%,rgba(0,0,0,.6) 48%,rgba(0,0,0,.36) 64%,rgba(0,0,0,.16) 80%,transparent 100%)!important;
-    mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,#000 4%,#000 18%,rgba(0,0,0,.82) 32%,rgba(0,0,0,.6) 48%,rgba(0,0,0,.36) 64%,rgba(0,0,0,.16) 80%,transparent 100%)!important}
+    -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,#000 4%,#000 16%,rgba(0,0,0,.8) 30%,rgba(0,0,0,.55) 46%,rgba(0,0,0,.3) 62%,rgba(0,0,0,.12) 80%,transparent 100%),
+      linear-gradient(to right,transparent 0%,#000 5%,#000 95%,transparent 100%)!important;-webkit-mask-composite:source-in!important;
+    mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,#000 4%,#000 16%,rgba(0,0,0,.8) 30%,rgba(0,0,0,.55) 46%,rgba(0,0,0,.3) 62%,rgba(0,0,0,.12) 80%,transparent 100%),
+      linear-gradient(to right,transparent 0%,#000 5%,#000 95%,transparent 100%)!important;mask-composite:intersect!important}
   /* bez sivého pásu a čiary pod obrázkom (len hlavná lišta, nie lepkavá hlavička pri posúvaní) */
   ._3VQUewWB8g6Z5qB4C7dGFr ._3fLo166MlaNqP8r8tTyRz,._3VQUewWB8g6Z5qB4C7dGFr .Jbe--NUNw7sxbxGsMSjVa{background:transparent!important;border:0!important;box-shadow:none!important}
   img[src*="library_hero_blur"]:not([class*="_3_IUV"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.55) 8%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.12) 70%,transparent 95%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.55) 8%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.12) 70%,transparent 95%)!important}
@@ -730,7 +762,7 @@
   async function refreshFeatures() {
     try { Object.assign(FEAT, await call("features")); } catch (e) {}
     try { setTheme(await call("theme")); } catch (e) {}
-    if (!MILL.length || Date.now() - (window.__psiMillT || 0) > 15000) { window.__psiMillT = Date.now(); await refreshMillennium(); }
+    if (!MILL.length || Date.now() - (window.__psiMillT || 0) > 15000) { window.__psiMillT = Date.now(); await refreshMillennium(); await refreshCustom(); }
     try { await refreshFont(); } catch (e) {}
   }
   function applyRounded(doc) {
@@ -818,7 +850,11 @@
       timer = null;
       if (!isOn()) return;
       const vw = win.innerWidth || 1;
-      for (const e of doc.querySelectorAll("div,a,button,img,video,input,select,textarea,section,li,form,canvas,span,label,ul,table,h1,h2,h3")) {
+      const SEL = "div,a,button,img,video,input,select,textarea,section,li,form,canvas,span,label,ul,table,h1,h2,h3";
+      let list;
+      if (full) { list = doc.querySelectorAll(SEL); full = false; roots.clear(); }
+      else { list = []; for (const r of roots) { if (r.isConnected) { if (r.matches(SEL)) list.push(r); list.push(...r.querySelectorAll(SEL)); } } roots.clear(); }
+      for (const e of list) {
         if (done.has(e)) continue;
         const r = e.getBoundingClientRect();
         if (!r.width || !r.height) continue;              // skryté – skúsime neskôr
@@ -855,11 +891,18 @@
         e.dataset.psiAr = "1";
       }
     };
+    const roots = new Set();
+    let full = true;
     const schedule = () => { if (!timer) timer = win.setTimeout(pass, 450); };
-    const mo = new win.MutationObserver(schedule);
+    const mo = new win.MutationObserver(recs => {
+      for (const r of recs) for (const n of r.addedNodes) if (n.nodeType === 1) roots.add(n);
+      if (roots.size > 400) { roots.clear(); full = true; }
+      schedule();
+    });
     mo.observe(doc.documentElement, {childList: true, subtree: true});
-    win.addEventListener("scroll", schedule, {passive: true});
-    win.__psiAutoRoundStop = () => { mo.disconnect(); win.removeEventListener("scroll", schedule); if (timer) win.clearTimeout(timer); };
+    const onScroll = () => { full = true; schedule(); };      // pri posúvaní sa môžu objaviť skryté prvky
+    win.addEventListener("scroll", onScroll, {passive: true, capture: true});
+    win.__psiAutoRoundStop = () => { mo.disconnect(); win.removeEventListener("scroll", onScroll, {capture: true}); if (timer) win.clearTimeout(timer); };
     schedule();
   }
 
@@ -1065,6 +1108,17 @@
     }
   }
 
+  /* ---------------- vlastné CSS (Nastavenia → PSI) ---------------- */
+  let CUSTOM_CSS = "";
+  async function refreshCustom() { try { CUSTOM_CSS = (await call("custom_css")).css || ""; } catch (e) {} }
+  function applyCustom(doc) {
+    let st = doc.getElementById("psi-custom");
+    if (!CUSTOM_CSS) { st && st.remove(); return; }
+    if (!st) { st = doc.createElement("style"); st.id = "psi-custom"; (doc.head || doc.documentElement).appendChild(st); }
+    if (st.textContent !== CUSTOM_CSS) st.textContent = CUSTOM_CSS;
+    st.parentNode.appendChild(st);                      // vždy posledný → má prednosť
+  }
+
   /* ---------------- Millennium téma (len CSS, bez JavaScriptu) ---------------- */
   let MILL = [];
   async function refreshMillennium() { try { MILL = await call("millennium_patches"); } catch (e) { MILL = []; } }
@@ -1104,7 +1158,7 @@
       if (!pm || !pm.m_mapPopups) return;
       for (const p of pm.m_mapPopups.values()) {
         const doc = p.m_popup && p.m_popup.document;
-        if (doc) { applyRounded(doc); applyFont(doc); applyMillennium(doc, p.m_strTitle); psiAutoRound(doc, () => FEAT.rounded); }
+        if (doc) { applyRounded(doc); applyFont(doc); applyMillennium(doc, p.m_strTitle); applyCustom(doc); psiAutoRound(doc, () => FEAT.rounded); }
         if (doc && doc.querySelector('.PageListColumn [role="tablist"] [id*="/settings/"]')) attachSettings(doc);
       }
     } catch (e) { /* Steam UI sa mení – skúsime znova */ }
@@ -1116,8 +1170,8 @@
   setTimeout(exportLibrary, 4000);
   const libExportTimer = setInterval(exportLibrary, 30 * 60e3);
   const featTimer = setInterval(refreshFeatures, 4000);
-  const timer = setInterval(scan, 1000);
-  const libTimer = setInterval(libraryTick, 350);
+  const timer = setInterval(scan, 1500);
+  const libTimer = setInterval(libraryTick, 500);
   const extraTimer = setInterval(() => { try { libraryExtras(); } catch (e) {} try { downloadsExtras(); } catch (e) {} }, 800);
   const wdTimer = setInterval(() => { windowWatchdog().catch(() => {}); }, 2000);
   window.__psiCleanup = () => {
@@ -1134,7 +1188,7 @@
       if (!doc) continue;
       const panel = doc.getElementById("psi-settings");
       if (panel) { [...panel.parentElement.children].forEach(ch => { ch.style.display = ""; }); panel.remove(); }
-      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme", "psi-extra", "psi-dl", "psi-dlinfo", "psi-millennium"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
+      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme", "psi-extra", "psi-dl", "psi-dlinfo", "psi-millennium", "psi-custom"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
       doc.querySelectorAll(".psi-lib, .psi-libcard").forEach(e => e.remove());
     }
   };

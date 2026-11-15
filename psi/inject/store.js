@@ -168,7 +168,11 @@
     };
     if (!put()) { const mo = new MutationObserver(() => { if (put()) mo.disconnect(); }); mo.observe(document, {childList: true, subtree: true}); }
   }
-  window.__psiApplyTheme = t => { if (!t) return; window.__psiRadius = +t.radius || 12; addStyle("psi-theme", psiThemeCss(t, "web")); };
+  window.__psiApplyTheme = t => {
+    if (!t) return; window.__psiRadius = +t.radius || 12; addStyle("psi-theme", psiThemeCss(t, "web"));
+    if (window.__psiCall && !window.__PSI_BOOT_FIRST) window.__psiCall("custom_css").then(c => addStyle("psi-custom", c.css || "")).catch(() => {});
+    window.__PSI_BOOT_FIRST = false;
+  };
   const applyFont = c => { if (c && c.family) addStyle("psi-font", c.face + `*:not(svg):not(svg *):not(code):not(pre){font-family:"${c.family}","Motiva Sans",Arial,sans-serif!important}`); };
   const applyLook = (f, t) => {
     if (f.rounded === false) return;
@@ -216,6 +220,7 @@
     const css = BOOT.millennium.filter(p => { try { return new RegExp(p.re).test(location.href); } catch (e) { return false; } }).map(p => p.css).join("\n");
     if (css) addStyle("psi-millennium", css);
   }
+  if (BOOT && BOOT.custom_css) { addStyle("psi-custom", BOOT.custom_css); window.__PSI_BOOT_FIRST = true; }
   if (BOOT) {                                   // okamžite – údaje vložila služba spolu so skriptom
     applyLook(BOOT.features || {}, BOOT.theme || {});
     applyFont(BOOT.font);

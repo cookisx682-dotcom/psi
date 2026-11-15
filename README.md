@@ -21,6 +21,8 @@ web app for your home Wi-Fi.
   custom fonts (system or uploaded).
 - **Theme editor** – accent colour, panel colour and opacity, blur, corner radius,
   presets and a live window preview.
+- **Custom CSS** – write any CSS in Settings → PSI; it applies to the whole client and store and wins over
+  PSI and Millennium styles.
 - **Millennium themes** – pick a theme from [steambrew.app](https://steambrew.app/themes), install it from a
   GitHub URL or drop it into `~/.local/share/psi/millennium/`. Only the theme's CSS is used (assets are
   inlined); theme JavaScript is never executed.
