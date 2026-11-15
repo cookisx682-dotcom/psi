@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.56";
+  const VERSION = "1.57";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -702,8 +702,8 @@
   .psi-libcard{border-radius:12px!important}.psi-pcard{border-radius:10px!important}
   /* jednotné farby celého okna odvodené z témy (lišta, spodok, ľavý panel, stránky knižnice) */
   /* svetlejšia modrá: hlavná plocha (bg) a o odtieň tmavší rám – ľavý panel, lišta, spodok (bg2) */
-  :root{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 52%,#2b4568);--psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 64%,#223858);
-    --psi-ctl:color-mix(in srgb,var(--psi-bg2) 70%,#ffffff 12%)}
+  :root{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 38%,#2c3139);--psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 42%,#23272e);
+    --psi-ctl:color-mix(in srgb,var(--psi-bg2) 72%,#ffffff 11%)}
   ._3Z7VQ1IMk4E3HsHvrkLNgo,._3vCzSrrXZzZjVJFZNg9SGu{background:var(--psi-bg2)!important;box-shadow:none!important}
   /* prechod lišta → obsah bez sivých čiar a pôvodných farieb Steamu */
   ._2TKEazUUS3TlniZfpc8OOe,._2CmrnGY-Amtd83ScJkFvx2{background:var(--psi-bg2)!important;box-shadow:none!important;border:0!important}
