@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.57";
+  const VERSION = "1.58";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -616,9 +616,11 @@
     box.innerHTML = `
       <div class="psi-about-head" style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
         <div style="font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#dcdedf;font-weight:500">O hre</div>
-        <svg class="psi-chev" width="14" height="14" viewBox="0 0 14 14" style="transition:transform .2s;transform:rotate(${open ? 90 : 0}deg)"><path d="M5 3l4 4-4 4" fill="none" stroke="#dcdedf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="psi-chev" width="14" height="14" viewBox="0 0 14 14" style="transition:transform .38s cubic-bezier(.22,1,.36,1);transform:rotate(${open ? 90 : 0}deg)"><path d="M5 3l4 4-4 4" fill="none" stroke="#dcdedf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      <div class="psi-about-body" style="display:${open ? "flex" : "none"};gap:24px;align-items:flex-start;margin-top:12px">
+      <div class="psi-about-wrap" style="display:grid;grid-template-rows:${open ? "1fr" : "0fr"};opacity:${open ? 1 : 0};transition:grid-template-rows .38s cubic-bezier(.22,1,.36,1),opacity .3s ease">
+      <div style="overflow:hidden;min-height:0">
+      <div class="psi-about-body" style="display:flex;gap:24px;align-items:flex-start;padding-top:12px">
       <div style="flex:1;min-width:0">
         <div style="color:#c6d4df;font-size:14px;line-height:1.55">${esc(info.desc || "Popis hry nie je k dispozícii.")}</div>
         ${who ? `<div style="color:#8b929a;font-size:12.5px;margin-top:12px">${esc(who)}</div>` : ""}
@@ -629,11 +631,12 @@
         <div style="color:#5b6170;font-size:11px;margin-top:10px">Údaje: ProtonDB, AreWeAntiCheatYet, Steam · PSI</div>
       </div>
       ${protonCard(info)}
-      </div>`;
+      </div></div></div>`;
     box.querySelector(".psi-about-head").addEventListener("click", e => {
       e.stopPropagation();
-      const body = box.querySelector(".psi-about-body"), now = body.style.display === "none";
-      body.style.display = now ? "flex" : "none";
+      const wrap = box.querySelector(".psi-about-wrap"), now = wrap.style.gridTemplateRows !== "1fr";
+      wrap.style.gridTemplateRows = now ? "1fr" : "0fr";
+      wrap.style.opacity = now ? "1" : "0";
       box.querySelector(".psi-chev").style.transform = `rotate(${now ? 90 : 0}deg)`;
       try { doc.defaultView.localStorage.setItem("psi-about-open", now ? "1" : "0"); } catch (err) {}
     });
