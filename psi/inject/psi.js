@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.42";
+  const VERSION = "1.44";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -799,6 +799,16 @@
         }
         if (e.closest(".ContextMenuPopupBody") && r.width > vw * 0.9) continue;
         const cs = win.getComputedStyle(e);
+        // vnútorný diel karty (cez celú šírku zaobleného rodiča) – rohy oreže rodič, sám nezaobľovať
+        let docked = false;
+        for (let p = e.parentElement, i = 0; p && i < 4; p = p.parentElement, i++) {
+          const pr = p.getBoundingClientRect();
+          if (win.getComputedStyle(p).borderTopLeftRadius !== "0px" && Math.abs(pr.left - r.left) < 2 && Math.abs(pr.right - r.right) < 2) { docked = true; break; }
+        }
+        if (docked) {
+          if (e.dataset.psiAr) { e.style.removeProperty("border-radius"); delete e.dataset.psiAr; }
+          continue;
+        }
         if (cs.borderTopLeftRadius !== "0px" || (cs.display === "inline" && e.tagName === "SPAN")) continue;
         const bg = cs.backgroundColor;
         const visible = MEDIA.test(e.tagName) || (bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") ||
@@ -835,9 +845,12 @@
   const EXTRA_CSS = `
   @keyframes psiRainbow{0%{background-position:0% 50%}100%{background-position:200% 50%}}
   @keyframes psiPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-  .psi-rainbow{background:linear-gradient(90deg,#ff3b3b,#ff9f1a,#ffe14d,#3ddc84,#22d3ee,#4f7cff,#b05cff,#ff3b3b)!important;
-    background-size:200% 100%!important;animation:psiRainbow 4s linear infinite;border-radius:99px!important;box-shadow:0 0 10px rgba(255,255,255,.18)}
+  .psi-rainbow{background:var(--psi-accent,#1a9fff)!important;animation:none!important;border-radius:99px!important;
+    box-shadow:0 0 8px color-mix(in srgb,var(--psi-accent,#1a9fff) 45%,transparent)!important}
   .psi-rainbow-track{border-radius:99px!important;overflow:hidden;background:rgba(0,0,0,.45)!important}
+  /* pruh achievementov: 1. diel = výplň vo farbe témy, 2. diel = dráha */
+  ._2YzOLNBx6TonKU0Zmp20l4:first-child:not(:only-child){background:var(--psi-accent,#1a9fff)!important;border-radius:99px 0 0 99px!important}
+  ._2YzOLNBx6TonKU0Zmp20l4:last-child:not(:only-child){border-radius:0 99px 99px 0!important}
   .psi-newcard{position:relative;border-radius:var(--psi-radius,12px)!important;transition:box-shadow .3s}
   .psi-newbadge{position:absolute;top:10px;right:12px;z-index:5;padding:3px 10px;border-radius:99px;font:800 11px/1.4 "Motiva Sans",Arial,sans-serif;
     letter-spacing:.08em;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4);pointer-events:none;
@@ -890,8 +903,17 @@
         if (!/unlocked|odomkn/i.test(n.textContent) || !n.parentElement.offsetParent) continue;
         let box = n.parentElement; for (let i = 0; i < 3 && box.parentElement; i++) box = box.parentElement;
         const bars = [...box.querySelectorAll("div")].filter(x => { const r = x.getBoundingClientRect(); return r.height > 3 && r.height < 14 && r.width > 4; });
-        if (bars.length >= 2) fills.push(bars[bars.length - 1]);
+        // výplň je diel s farbou pozadia (zvyšok dráhy je priehľadný)
+        const fill = bars.find(x => { const c = getComputedStyle(x).backgroundColor; return c !== "rgba(0, 0, 0, 0)" && c !== "rgb(0, 0, 0)" && x.parentElement && x.parentElement.children.length > 1; });
+        if (fill) fills.push(fill);
         break;
+      }
+    }
+    for (const x of doc.querySelectorAll(".psi-rainbow")) {
+      const sib = x.parentElement && [...x.parentElement.children];
+      if (sib && sib.length > 1 && sib.indexOf(x) > 0 && sib[0].className === x.className.replace(" psi-rainbow", "")) {
+        x.classList.remove("psi-rainbow");                   // zvyšok dráhy, nie výplň
+        if (!sib[0].classList.contains("psi-rainbow")) fills.push(sib[0]);
       }
     }
     for (const f of fills) {
