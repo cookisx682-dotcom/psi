@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.49";
+  const VERSION = "1.50";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -701,7 +701,7 @@
   ._3qDWQGB0rtwM3qpXTb11Q-{border-radius:8px}
   .psi-libcard{border-radius:12px!important}.psi-pcard{border-radius:10px!important}
   /* jednotné farby celého okna odvodené z témy (lišta, spodok, ľavý panel, stránky knižnice) */
-  :root{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 55%,#05080d);--psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 72%,#0a0f16)}
+  :root{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 72%,#1c2533);--psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 80%,#222c3b)}
   ._3Z7VQ1IMk4E3HsHvrkLNgo,._3vCzSrrXZzZjVJFZNg9SGu{background:var(--psi-bg)!important}
   ._3x1HklzyDs4TEjACrRO2tB{background:var(--psi-bg2)!important}
   /* hlavičky kategórií v ľavom zozname: bez vlastného pozadia, len jemná deliaca čiara */
@@ -709,7 +709,8 @@
   ._3lDczhulqraStjCitLYJ1K,._2Dd4T78PcCTUVgOtDGFY5j{background:var(--psi-bg)!important}
   /* menu: okno nezaobľujeme (je nepriehľadné → čierne rohy); tón panelov, zvýraznenie vo farbe akcentu */
   .ContextMenuPopupBody #popup_target > div,.ContextMenuPopupBody #popup_target > div > div{background:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 82%,#ffffff 8%)!important}
-  .ContextMenuPopupBody .contextMenuItem{border-radius:8px;margin:2px 5px;background:transparent!important}
+  /* položky cez celú šírku bez zaoblenia – okno menu je hranaté, inak okolo presvitá tmavý štvorec */
+  .ContextMenuPopupBody .contextMenuItem{border-radius:0!important;margin:0!important;background:transparent!important}
   .ContextMenuPopupBody .contextMenuItem:hover,.ContextMenuPopupBody .contextMenuItem:focus,.ContextMenuPopupBody .contextMenuItem.active{
     background:color-mix(in srgb,var(--psi-accent,#1a9fff) 38%,transparent)!important;color:#fff!important}
   .PageListColumn [role="tab"]{border-radius:8px}
@@ -1027,7 +1028,7 @@
   /* pozadie stránky odvodené z farby témy (predtým sivé Steam pozadie → „bahnité“ karty) */
   ._1bq4x9pa4-9RLY-dXWUZTp:has(._2sCvZTD6ZTZz3p9_ekH_gI),._2Dd4T78PcCTUVgOtDGFY5j:has(._2sCvZTD6ZTZz3p9_ekH_gI){
     background:radial-gradient(1200px 500px at 15% 0%,color-mix(in srgb,var(--psi-accent,#1a9fff) 9%,transparent),transparent 70%),
-      color-mix(in srgb,var(--psi-panel-solid,#121c2c) 55%,#05080d)!important}
+      var(--psi-bg)!important}
   ._1ugNiylO2vKXhirsGocAxa ._3ebCJiEl-ybizhZ4avcFw5{background:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 70%,#ffffff 6%)!important}
   /* graf siete: jemne mizne k okrajom karty */
   ._2-AUyaXfJHWP85tZVENytR{-webkit-mask-image:linear-gradient(to right,transparent,#000 12%,#000 88%,transparent),linear-gradient(to top,transparent,#000 30%);
