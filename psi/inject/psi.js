@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.39";
+  const VERSION = "1.41";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -650,8 +650,13 @@
   ._2-O4ZG0KrnSrzISHBKctFQ{border-radius:6px}
   ._2Szzh5sKyGgnLUR870zbDE{border-radius:8px!important}
   ._3yD46y5pd3zOGR7CzKs0mC{border-radius:8px!important;overflow:hidden}
-  img.HNbe3eZf6H7dtJ042x1vM[src*="library_hero."]:not([src*="blur"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 6%,#000 16%,#000 24%,rgba(0,0,0,.45) 48%,transparent 74%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 6%,#000 16%,#000 24%,rgba(0,0,0,.45) 48%,transparent 74%)!important}
-  img[src*="library_hero_blur"]:not([class*="_3_IUV"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 8%,rgba(0,0,0,.3) 35%,transparent 62%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 8%,rgba(0,0,0,.3) 35%,transparent 62%)!important}
+  /* obrázok hry: vyšší, pokračuje za lištou s tlačidlom a dlho, plynulo mizne */
+  img.HNbe3eZf6H7dtJ042x1vM[src*="library_hero."]:not([src*="blur"]){height:500px!important;object-fit:cover!important;object-position:center top!important;
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 5%,#000 13%,#000 30%,rgba(0,0,0,.72) 45%,rgba(0,0,0,.4) 62%,rgba(0,0,0,.15) 80%,transparent 100%)!important;
+    mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 5%,#000 13%,#000 30%,rgba(0,0,0,.72) 45%,rgba(0,0,0,.4) 62%,rgba(0,0,0,.15) 80%,transparent 100%)!important}
+  /* bez sivého pásu a čiary pod obrázkom (len hlavná lišta, nie lepkavá hlavička pri posúvaní) */
+  ._3VQUewWB8g6Z5qB4C7dGFr ._3fLo166MlaNqP8r8tTyRz,._3VQUewWB8g6Z5qB4C7dGFr .Jbe--NUNw7sxbxGsMSjVa{background:transparent!important;border:0!important;box-shadow:none!important}
+  img[src*="library_hero_blur"]:not([class*="_3_IUV"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.55) 8%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.12) 70%,transparent 95%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.55) 8%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.12) 70%,transparent 95%)!important}
   /* bodka vo farbe témy pri vybranej / označenej hre v zozname */
   ._2-O4ZG0KrnSrzISHBKctFQ{position:relative}
   ._2-O4ZG0KrnSrzISHBKctFQ._1UBpAXP408Ez_L_mXhW5Q9::before,._2-O4ZG0KrnSrzISHBKctFQ:hover::before{content:"";position:absolute;left:8px;top:50%;width:6px;height:6px;margin-top:-3px;
@@ -870,6 +875,11 @@
           `0 0 ${Math.round(6 + 10 * a)}px ${acc}${Math.round(al * 90).toString(16).padStart(2, "0")}`;
         card.querySelectorAll(".psi-newbadge").forEach(x => x.remove());
       }
+    }
+    // dúhový aj pruh sťahovania v lište hry
+    for (const tr of doc.querySelectorAll("._25YVDTaClw6Y2COPsU0UaV")) {
+      const f = tr.querySelector("._1FnTqlsi2_-TJf1d5apoS6") || tr.firstElementChild;
+      if (f && !f.classList.contains("psi-rainbow")) { f.classList.add("psi-rainbow"); tr.classList.add("psi-rainbow-track"); }
     }
     // dúhový pruh achievementov
     let fills = [...doc.querySelectorAll("._3Rm36_oeAhvIg6ZYP9l1Jj:not(.psi-rainbow)")];
