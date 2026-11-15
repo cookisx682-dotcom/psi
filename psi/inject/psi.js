@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.60";
+  const VERSION = "1.61";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -712,7 +712,7 @@
   ._2T8UwmbZ9jJzntqjQU4czU{color:#fff!important;font-weight:400!important}
   ._2d9pc_ziCjBFV-KGQ-nsCh{color:#bfc6cd!important}
   /* tlačidlo Scroll to top – pilulka v farbe témy */
-  ._1J21tLst5SEhBPkVRT53UV{overflow:visible!important;padding:6px 0!important;display:flex!important;justify-content:center!important;align-items:center!important}
+  ._1J21tLst5SEhBPkVRT53UV{overflow:visible!important;padding:6px 0 6px var(--psi-lib-left,0px)!important;box-sizing:border-box!important;display:flex!important;justify-content:center!important;align-items:center!important}
   ._1J21tLst5SEhBPkVRT53UV > div{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:26px!important;padding:0 30px!important;line-height:1!important;margin:0!important;box-sizing:border-box!important;background:color-mix(in srgb,var(--psi-accent,#1a9fff) 78%,var(--psi-bg2,#23272e))!important;color:#fff!important;border-radius:99px!important;box-shadow:0 4px 14px rgba(0,0,0,.35)!important;font-weight:600!important;transition:filter .15s}
   /* pripnutá lišta (Play/Download) pri scrollovaní dole – skryť úplne */
   ._2Nq6ov7A1hGcHXVOXNt_OE > ._2L3s2nzh7yCnNESfI5_dN1{display:none!important}
@@ -1117,10 +1117,28 @@
   /* poistka: Steam na Linuxe po obnovení okna niekedy nechá vnútro okna malé (napr. 600×113)
      a hlavný kontajner posunutý – zvyšok okna je čierny. PSI to samo opraví. */
   let fixingWindow = false;
+  // ľavý okraj pravého panelu knižnice → podľa neho centrujeme Scroll to top
+  function syncLibLeft(w) {
+    const rp = w.document.querySelector("._3BFcmjAaMyP6GTPwc0VyWi");
+    const x = rp ? Math.max(0, Math.round(rp.getBoundingClientRect().left)) : 0;
+    const v = x + "px", st = w.document.documentElement.style;
+    if (st.getPropertyValue("--psi-lib-left") !== v) st.setProperty("--psi-lib-left", v);
+  }
+  {
+    const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
+    const w = pop && pop.m_popup;
+    if (w) {
+      let pend = false;
+      const onScroll = () => { if (pend) return; pend = true; w.requestAnimationFrame(() => { pend = false; syncLibLeft(w); }); };
+      w.document.addEventListener("scroll", onScroll, true);
+      window.__psiScrollOff = () => { try { w.document.removeEventListener("scroll", onScroll, true); } catch (e) {} };
+    }
+  }
   async function windowWatchdog() {
     const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
     const w = pop && pop.m_popup;
     if (!w || fixingWindow || w.document.hidden) return;
+    syncLibLeft(w);
     const tooSmall = w.outerHeight > 300 && w.innerHeight < w.outerHeight * 0.6;
     if (tooSmall) {
       fixingWindow = true;
@@ -1210,6 +1228,7 @@
   const wdTimer = setInterval(() => { windowWatchdog().catch(() => {}); }, 2000);
   window.__psiCleanup = () => {
     active = false;
+    try { window.__psiScrollOff && window.__psiScrollOff(); } catch (e) {}
     clearInterval(timer);
     clearInterval(featTimer);
     clearInterval(colTimer);
