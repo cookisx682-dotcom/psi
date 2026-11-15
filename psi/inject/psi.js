@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.48";
+  const VERSION = "1.49";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -704,6 +704,8 @@
   :root{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 55%,#05080d);--psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 72%,#0a0f16)}
   ._3Z7VQ1IMk4E3HsHvrkLNgo,._3vCzSrrXZzZjVJFZNg9SGu{background:var(--psi-bg)!important}
   ._3x1HklzyDs4TEjACrRO2tB{background:var(--psi-bg2)!important}
+  /* hlavičky kategórií v ľavom zozname: bez vlastného pozadia, len jemná deliaca čiara */
+  ._2sYIghGVXJr6tsQVvcryy8{background:transparent!important;border-radius:0!important;box-shadow:inset 0 -1px 0 rgba(255,255,255,.05)!important}
   ._3lDczhulqraStjCitLYJ1K,._2Dd4T78PcCTUVgOtDGFY5j{background:var(--psi-bg)!important}
   /* menu: okno nezaobľujeme (je nepriehľadné → čierne rohy); tón panelov, zvýraznenie vo farbe akcentu */
   .ContextMenuPopupBody #popup_target > div,.ContextMenuPopupBody #popup_target > div > div{background:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 82%,#ffffff 8%)!important}
@@ -716,11 +718,12 @@
   ._2Szzh5sKyGgnLUR870zbDE{border-radius:8px!important}
   ._3yD46y5pd3zOGR7CzKs0mC{border-radius:8px!important;overflow:hidden}
   /* obrázok hry: vyšší, pokračuje za lištou s tlačidlom a dlho, plynulo mizne */
+  /* obrázok hry: dlho celý, potom mäkko (ease-out) zmizne – bez fade do strán */
   img.HNbe3eZf6H7dtJ042x1vM[src*="library_hero."]:not([src*="blur"]){
-    -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,#000 4%,#000 16%,rgba(0,0,0,.8) 30%,rgba(0,0,0,.55) 46%,rgba(0,0,0,.3) 62%,rgba(0,0,0,.12) 80%,transparent 100%),
-      linear-gradient(to right,transparent 0%,#000 5%,#000 95%,transparent 100%)!important;-webkit-mask-composite:source-in!important;
-    mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,#000 4%,#000 16%,rgba(0,0,0,.8) 30%,rgba(0,0,0,.55) 46%,rgba(0,0,0,.3) 62%,rgba(0,0,0,.12) 80%,transparent 100%),
-      linear-gradient(to right,transparent 0%,#000 5%,#000 95%,transparent 100%)!important;mask-composite:intersect!important}
+    -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.92) 0%,#000 4%,#000 46%,rgba(0,0,0,.9) 55%,rgba(0,0,0,.72) 64%,rgba(0,0,0,.5) 73%,rgba(0,0,0,.3) 82%,rgba(0,0,0,.13) 91%,transparent 100%)!important;
+    mask-image:linear-gradient(to bottom,rgba(0,0,0,.92) 0%,#000 4%,#000 46%,rgba(0,0,0,.9) 55%,rgba(0,0,0,.72) 64%,rgba(0,0,0,.5) 73%,rgba(0,0,0,.3) 82%,rgba(0,0,0,.13) 91%,transparent 100%)!important}
+  /* rozmazaná kópia za obrázkom: tlmenejšia, aby nefarbila stránku */
+  img[src*="library_hero_blur"]:not([class*="_3_IUV"]){opacity:.5!important}
   /* bez sivého pásu a čiary pod obrázkom (len hlavná lišta, nie lepkavá hlavička pri posúvaní) */
   ._3VQUewWB8g6Z5qB4C7dGFr ._3fLo166MlaNqP8r8tTyRz,._3VQUewWB8g6Z5qB4C7dGFr .Jbe--NUNw7sxbxGsMSjVa{background:transparent!important;border:0!important;box-shadow:none!important}
   img[src*="library_hero_blur"]:not([class*="_3_IUV"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.55) 8%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.12) 70%,transparent 95%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.55) 8%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.12) 70%,transparent 95%)!important}
