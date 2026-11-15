@@ -21,6 +21,9 @@ web app for your home Wi-Fi.
   custom fonts (system or uploaded).
 - **Theme editor** – accent colour, panel colour and opacity, blur, corner radius,
   presets and a live window preview.
+- **Millennium themes** – pick a theme from [steambrew.app](https://steambrew.app/themes), install it from a
+  GitHub URL or drop it into `~/.local/share/psi/millennium/`. Only the theme's CSS is used (assets are
+  inlined); theme JavaScript is never executed.
 - **Instant styling** – PSI attaches to every new store page the moment it is created,
   so styles are in place before the first paint.
 - **KDE notifications** when a wishlisted game goes on sale.
@@ -60,6 +63,7 @@ journalctl --user -u psi -f
 | Profile: *My week* showcase | `psi/inject/community.js` |
 | Companion server (port 8787) and PWA | `psi/companion/server.py`, `psi/companion/index.html` |
 | QR code in the terminal | `psi/qr.py` |
+| Millennium theme loader (skin.json patches, CSS only) | `psi/millennium.py` |
 
 Data lives in `~/.local/share/psi/` (`config.json`, `cache.json`, `snapshots.json`, `library.json`).
 

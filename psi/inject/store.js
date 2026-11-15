@@ -211,6 +211,11 @@
   }
   const startNav = () => { if (!psiAutoHideNav()) { let n = 0; const iv = setInterval(() => { if (psiAutoHideNav() || ++n > 40) clearInterval(iv); }, 150); } };
   const BOOT = window.__PSI_BOOT || null;
+  /* Millennium téma (len CSS) */
+  if (BOOT && Array.isArray(BOOT.millennium) && BOOT.millennium.length) {
+    const css = BOOT.millennium.filter(p => { try { return new RegExp(p.re).test(location.href); } catch (e) { return false; } }).map(p => p.css).join("\n");
+    if (css) addStyle("psi-millennium", css);
+  }
   if (BOOT) {                                   // okamžite – údaje vložila služba spolu so skriptom
     applyLook(BOOT.features || {}, BOOT.theme || {});
     applyFont(BOOT.font);

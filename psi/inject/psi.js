@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.44";
+  const VERSION = "1.46";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -243,9 +243,10 @@
   async function renderInner(doc) {
     const body = doc.getElementById("psi-body");
     if (!body) return;
-    let c, q, f, fonts, theme;
+    let c, q, f, fonts, theme, mill;
     try {
-      [c, q, f, fonts, theme] = await Promise.all([call("companion_info"), call("companion_qr"), call("features"), call("fonts"), call("theme")]);
+      [c, q, f, fonts, theme, mill] = await Promise.all([call("companion_info"), call("companion_qr"), call("features"), call("fonts"), call("theme"),
+        call("millennium").catch(() => ({themes: [], current: ""}))]);
     } catch (e) {
       body.innerHTML = `<div class="psi-card psi-err">PSI služba neodpovedá: ${esc(e.message)}<br><span class="psi-mut">Skontroluj: systemctl --user status psi</span></div>`;
       return;
@@ -296,6 +297,24 @@
         </div>
       </div>
 
+
+      <div class="psi-card">
+        <div class="psi-h">Millennium témy (steambrew.app)</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <select id="psi-mill-sel" style="min-width:260px;height:34px;padding:0 10px;background:#32353c;color:#fff;border:0;border-radius:8px;font-size:14px">
+            <option value="">Žiadna (len PSI vzhľad)</option>
+            ${mill.themes.map(t => `<option value="${esc(t.id)}" ${t.id === mill.current ? "selected" : ""}>${esc(t.name)}${t.author ? " · " + esc(t.author) : ""}</option>`).join("")}
+          </select>
+          <button type="button" class="DialogButton _DialogLayout Secondary Focusable" id="psi-mill-open" style="width:auto;padding:0 16px">Otvoriť priečinok</button>
+          <button type="button" class="DialogButton _DialogLayout Secondary Focusable" id="psi-mill-web" style="width:auto;padding:0 16px">Prehliadať témy</button>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
+          <input id="psi-mill-url" type="text" placeholder="https://github.com/autor/tema" style="flex:1;height:34px;border:0;border-radius:8px;background:#32353c;color:#fff;padding:0 10px;font-size:14px">
+          <button type="button" class="DialogButton _DialogLayout Primary Focusable" id="psi-mill-inst" style="width:auto;padding:0 16px">Inštalovať</button>
+        </div>
+        <div class="psi-mut" id="psi-mill-msg" style="margin-top:8px">Použije sa len CSS z témy – JavaScript z cudzích tém PSI nespúšťa. Ak sa štýly bijú s PSI, vypni „Moderný vzhľad“.</div>
+      </div>
+
       <div class="psi-card">
         <div class="psi-h">Písmo</div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -330,6 +349,22 @@
         </div>
       </div>
       <div class="psi-mut">PSI · lokálna služba na tomto PC · dáta v ~/.local/share/psi</div>`;
+
+    /* ---- Millennium ---- */
+    const mmsg = body.querySelector("#psi-mill-msg");
+    body.querySelector("#psi-mill-sel").addEventListener("change", async ev => {
+      try { await call("millennium_set", {id: ev.target.value}); await refreshMillennium(); scan(); mmsg.textContent = ev.target.value ? "Téma použitá." : "Millennium téma vypnutá."; }
+      catch (e) { mmsg.textContent = "Chyba: " + e.message; }
+    });
+    body.querySelector("#psi-mill-open").addEventListener("click", () => call("millennium_open").catch(() => {}));
+    body.querySelector("#psi-mill-web").addEventListener("click", () => openUrl("https://steambrew.app/themes"));
+    body.querySelector("#psi-mill-inst").addEventListener("click", async () => {
+      const url = body.querySelector("#psi-mill-url").value.trim();
+      if (!url) return;
+      mmsg.textContent = "Sťahujem tému…";
+      try { const r = await call("millennium_install", {url}); mmsg.textContent = `Nainštalované: ${r.installed.name}. Vyber ju v zozname.`; render(doc); }
+      catch (e) { mmsg.textContent = "Chyba: " + e.message; }
+    });
 
     /* ---- editor témy ---- */
     const tcur = {...theme};
@@ -651,9 +686,9 @@
   ._2Szzh5sKyGgnLUR870zbDE{border-radius:8px!important}
   ._3yD46y5pd3zOGR7CzKs0mC{border-radius:8px!important;overflow:hidden}
   /* obrázok hry: vyšší, pokračuje za lištou s tlačidlom a dlho, plynulo mizne */
-  img.HNbe3eZf6H7dtJ042x1vM[src*="library_hero."]:not([src*="blur"]){height:500px!important;object-fit:cover!important;object-position:center top!important;
-    -webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 5%,#000 13%,#000 30%,rgba(0,0,0,.72) 45%,rgba(0,0,0,.4) 62%,rgba(0,0,0,.15) 80%,transparent 100%)!important;
-    mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.6) 5%,#000 13%,#000 30%,rgba(0,0,0,.72) 45%,rgba(0,0,0,.4) 62%,rgba(0,0,0,.15) 80%,transparent 100%)!important}
+  img.HNbe3eZf6H7dtJ042x1vM[src*="library_hero."]:not([src*="blur"]){
+    -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,#000 4%,#000 18%,rgba(0,0,0,.82) 32%,rgba(0,0,0,.6) 48%,rgba(0,0,0,.36) 64%,rgba(0,0,0,.16) 80%,transparent 100%)!important;
+    mask-image:linear-gradient(to bottom,rgba(0,0,0,.85) 0%,#000 4%,#000 18%,rgba(0,0,0,.82) 32%,rgba(0,0,0,.6) 48%,rgba(0,0,0,.36) 64%,rgba(0,0,0,.16) 80%,transparent 100%)!important}
   /* bez sivého pásu a čiary pod obrázkom (len hlavná lišta, nie lepkavá hlavička pri posúvaní) */
   ._3VQUewWB8g6Z5qB4C7dGFr ._3fLo166MlaNqP8r8tTyRz,._3VQUewWB8g6Z5qB4C7dGFr .Jbe--NUNw7sxbxGsMSjVa{background:transparent!important;border:0!important;box-shadow:none!important}
   img[src*="library_hero_blur"]:not([class*="_3_IUV"]){-webkit-mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.55) 8%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.12) 70%,transparent 95%)!important;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.55) 8%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.12) 70%,transparent 95%)!important}
@@ -695,6 +730,7 @@
   async function refreshFeatures() {
     try { Object.assign(FEAT, await call("features")); } catch (e) {}
     try { setTheme(await call("theme")); } catch (e) {}
+    if (!MILL.length || Date.now() - (window.__psiMillT || 0) > 15000) { window.__psiMillT = Date.now(); await refreshMillennium(); }
     try { await refreshFont(); } catch (e) {}
   }
   function applyRounded(doc) {
@@ -1029,6 +1065,17 @@
     }
   }
 
+  /* ---------------- Millennium téma (len CSS, bez JavaScriptu) ---------------- */
+  let MILL = [];
+  async function refreshMillennium() { try { MILL = await call("millennium_patches"); } catch (e) { MILL = []; } }
+  function applyMillennium(doc, title) {
+    const css = MILL.filter(p => { try { return new RegExp(p.re).test(title || ""); } catch (e) { return false; } }).map(p => p.css).join("\n");
+    let st = doc.getElementById("psi-millennium");
+    if (!css) { st && st.remove(); return; }
+    if (!st) { st = doc.createElement("style"); st.id = "psi-millennium"; (doc.head || doc.documentElement).appendChild(st); }
+    if (st.textContent !== css) st.textContent = css;
+  }
+
   /* ---------------- vlastné písmo ---------------- */
   const FONT = {key: null, css: ""};
   async function refreshFont() {
@@ -1057,7 +1104,7 @@
       if (!pm || !pm.m_mapPopups) return;
       for (const p of pm.m_mapPopups.values()) {
         const doc = p.m_popup && p.m_popup.document;
-        if (doc) { applyRounded(doc); applyFont(doc); psiAutoRound(doc, () => FEAT.rounded); }
+        if (doc) { applyRounded(doc); applyFont(doc); applyMillennium(doc, p.m_strTitle); psiAutoRound(doc, () => FEAT.rounded); }
         if (doc && doc.querySelector('.PageListColumn [role="tablist"] [id*="/settings/"]')) attachSettings(doc);
       }
     } catch (e) { /* Steam UI sa mení – skúsime znova */ }
@@ -1087,7 +1134,7 @@
       if (!doc) continue;
       const panel = doc.getElementById("psi-settings");
       if (panel) { [...panel.parentElement.children].forEach(ch => { ch.style.display = ""; }); panel.remove(); }
-      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme", "psi-extra", "psi-dl", "psi-dlinfo"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
+      ["psi-tab", "psi-sep", "psi-style", "psi-lib", "psi-round", "psi-font", "psi-theme", "psi-extra", "psi-dl", "psi-dlinfo", "psi-millennium"].forEach(id => { const e = doc.getElementById(id); e && e.remove(); });
       doc.querySelectorAll(".psi-lib, .psi-libcard").forEach(e => e.remove());
     }
   };

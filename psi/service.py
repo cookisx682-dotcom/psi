@@ -375,6 +375,33 @@ class Psi:
         except Exception:
             log.exception("library.json")
 
+    # ------------------------------------------------------------------ Millennium témy
+    def millennium(self) -> dict:
+        from . import millennium as mi
+        mi.THEMES_DIR.mkdir(parents=True, exist_ok=True)
+        return {"themes": mi.list_themes(), "current": mi.current(), "dir": str(mi.THEMES_DIR)}
+
+    def millennium_set(self, theme_id: str) -> dict:
+        from . import millennium as mi
+        mi.set_theme(str(theme_id or ""))
+        self._changed()
+        return self.millennium()
+
+    def millennium_patches(self) -> list:
+        from . import millennium as mi
+        return mi.patches("client")
+
+    def millennium_install(self, url: str) -> dict:
+        from . import millennium as mi
+        t = mi.install_from_github(str(url or ""))
+        return {**self.millennium(), "installed": t}
+
+    def millennium_open(self) -> dict:
+        from . import millennium as mi
+        mi.THEMES_DIR.mkdir(parents=True, exist_ok=True)
+        subprocess.Popen(["xdg-open", str(mi.THEMES_DIR)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return {"ok": True}
+
     def theme(self) -> dict:
         return core.theme()
 
@@ -402,7 +429,8 @@ class Psi:
 BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
-               "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme", "disk", "save_library"},
+               "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme", "disk", "save_library",
+               "millennium", "millennium_set", "millennium_patches", "millennium_install", "millennium_open"},
     "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme"},
 }
 
@@ -442,6 +470,11 @@ class Injector(threading.Thread):
         if kind == "web":
             # štýly sa aplikujú synchrónne hneď na začiatku stránky – bez čakania na most
             boot = {"features": core.features(), "theme": core.theme()}
+            try:
+                from . import millennium as mi
+                boot["millennium"] = mi.patches("web")
+            except Exception:
+                boot["millennium"] = []
             try:
                 boot["font"] = self.psi.font_css()
             except Exception:
@@ -526,6 +559,10 @@ class Injector(threading.Thread):
                 result = fn(str(args.get("family", "")))
             elif method == "upload_font":
                 result = fn(str(args.get("name", "")), str(args.get("data", "")))
+            elif method == "millennium_set":
+                result = fn(str(args.get("id", "")))
+            elif method == "millennium_install":
+                result = fn(str(args.get("url", "")))
             elif method == "save_library":
                 result = fn(args.get("apps") or [])
             elif method == "set_theme":
