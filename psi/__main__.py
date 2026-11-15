@@ -128,7 +128,7 @@ def cmd_status() -> int:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="psi", description="PSI – Steam loader pre Linux")
-    p.add_argument("command", nargs="?", default="run", choices=["run", "install", "status", "snapshot"])
+    p.add_argument("command", nargs="?", default="run", choices=["run", "install", "status", "snapshot", "update"])
     p.add_argument("--companion", action="store_true", help="adresa, PIN a QR kód pre mobil")
     p.add_argument("--new-pin", action="store_true", help="s --companion: nový PIN, zruší prihlásenia")
     a = p.parse_args(argv)
@@ -138,6 +138,19 @@ def main(argv=None) -> int:
         return cmd_install()
     if a.command == "status":
         return cmd_status()
+    if a.command == "update":
+        from .service import check_update
+        st = check_update(apply=False)
+        if st.startswith("available"):
+            print("Nová verzia je k dispozícii – inštalujem a reštartujem službu…")
+            r = subprocess.run(["git", "-C", str(ROOT), "pull", "--ff-only"], check=False)
+            if r.returncode == 0:
+                subprocess.run(["systemctl", "--user", "restart", "psi"], check=False)
+                print("Hotovo.")
+        else:
+            print({"up-to-date": "PSI je aktuálne.", "offline": "GitHub je nedostupný.",
+                   "local-changes": "Máš lokálne zmeny – aktualizuj ručne (git pull).", "no-git": "PSI nie je git repozitár."}.get(st, st))
+        return 0
     if a.command == "snapshot":
         from .core import SNAPSHOTS
         print(f"{SNAPSHOTS.take()} hier zapísaných")

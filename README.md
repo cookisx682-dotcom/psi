@@ -1,76 +1,97 @@
-# Ψ PSI – Steam loader pre Linux
+# Ψ PSI – Steam enhancer for Linux
 
-Python služba (len stdlib), ktorá sa cez CEF debug port pripája do Steamu, vkladá vlastné skripty
-a na mobile ponúka **PSI Companion** v domácej Wi-Fi.
+PSI is a small Python service (standard library only) that hooks into the Steam client through its
+CEF remote-debugging port, injects its own scripts and styles, and serves **PSI Companion**, a mobile
+web app for your home Wi-Fi.
 
-## Inštalácia
+> The in-Steam interface is in Slovak; this README and the code base are documented in English.
+
+## Features
+
+**Inside Steam** (every feature can be toggled in *Steam → Settings → PSI*):
+
+- **Library** – ProtonDB medal next to each game, a collapsible *About* panel (description,
+  Linux / anti-cheat / Steam Deck status, FPS estimate), auto-collections such as
+  *PSI · Gold*, *PSI · Native Linux*, *PSI · Online won't work (anti-cheat)*.
+- **Store** – *Play on Linux* (why a game is Gold, anti-cheat status from AreWeAntiCheatYet),
+  *Performance on your PC* (FPS estimate), *Price & discount* (buy now / wait),
+  a warning before buying a game that won't run on Linux, badges on the wishlist page.
+- **Downloads** – rainbow progress bars, downloaded / total size, time remaining and free disk space.
+- **Modern look** – rounded corners everywhere, frosted-glass panels, fading game artwork,
+  custom fonts (system or uploaded).
+- **Theme editor** – accent colour, panel colour and opacity, blur, corner radius,
+  presets and a live window preview.
+- **Instant styling** – PSI attaches to every new store page the moment it is created,
+  so styles are in place before the first paint.
+- **KDE notifications** when a wishlisted game goes on sale.
+- **Profile** – a *My week* showcase with playtime and badges.
+- **Automatic updates** – every 6 hours PSI checks this repository and updates itself.
+
+**PSI Companion** – a PWA for your phone: weekly playtime, wishlist with deal estimates and
+countdowns, game search with ProtonDB data. Read-only, PIN-protected, LAN only.
+
+## Installation
 
 ```bash
-./bin/psi install          # systemd user služba + .cef-enable-remote-debugging + ~/.local/bin/psi
+git clone https://github.com/cookisx682-dotcom/psi.git ~/psi
+~/psi/bin/psi install      # systemd user service + .cef-enable-remote-debugging + ~/.local/bin/psi
 ```
 
-Potom reštartuj Steam. Steam CEF používa port 8080 (IPv4 `127.0.0.1` alebo IPv6 `[::1]`, PSI skúša oba).
-Iné programy na 8080 nepúšťaj – `bestdeal` je preto presunutý na port 3000
-(`~/.config/systemd/user/bestdeal.service.d/port.conf`).
+Then restart Steam. Steam's CEF debugger uses port **8080** (IPv4 `127.0.0.1` or IPv6 `[::1]`;
+PSI tries both), so nothing else may listen on that port.
 
 ```bash
-psi --companion            # adresa, PIN a QR kód pre telefón
-psi --companion --new-pin  # nový PIN + odhlásenie všetkých telefónov
+psi --companion            # address, PIN and QR code for your phone
+psi --companion --new-pin  # new PIN, signs out all phones
 psi status
+psi update                 # check GitHub for a new version right now
 journalctl --user -u psi -f
 ```
 
-## Čo robí
+## Project layout
 
-**V Steame** (všetko sa zapína/vypína v Steam → Nastavenia → PSI):
-- **Knižnica:** ProtonDB medaila pri hre, rozbaľovacie „O hre“ (popis, Linux/anti-cheat/Steam Deck, odhad FPS), auto-kolekcie „PSI · Gold / Natívne / Online nepôjde…“.
-- **Obchod:** „Hrať na Linuxe“ (prečo Gold, anti-cheat z AreWeAntiCheatYet), „Výkon na tvojom PC“ (odhad FPS), „Cena a zľava“ (kúp/počkaj), varovanie pred kúpou, odznaky na wishliste.
-- **Moderný vzhľad:** zaoblené rohy všade, sklenené panely, miznúci obrázok hry; vlastné písmo (systémové alebo nahrané).
-- **Editor témy:** akcentová farba, farba a priehľadnosť panelov, rozmazanie, zaoblenie, predvoľby a živý náhľad okien.
-- **Okamžité načítanie:** PSI sa pripojí ku každej stránke obchodu v momente vzniku – štýly sú tam skôr, než sa vykreslí.
-- **Notifikácie v KDE** pri zľave hry z wishlistu.
-- **Profil:** vitrína „Môj týždeň“.
-
-| Časť | Súbor |
+| Part | File |
 |---|---|
-| ProtonDB, CheapShark, Steam Store, `estimate_deal`, `Snapshots` | `psi/core.py` |
-| Trieda `Psi` (`week`, `wishlist`, `deal`, `protondb`, `game`, `search`), CEF injector, most `__psiBridge` | `psi/service.py`, `psi/cdp.py` |
-| Steam → Nastavenia → **PSI**: týždeň, Companion (adresy, PIN, QR, nový PIN), prepínače funkcií | `psi/inject/psi.js` |
-| Obchod: medaila, odpočet konca zľavy, odhad, kúp/počkaj | `psi/inject/store.js` |
-| Profil: vitrína „Môj týždeň“ + odznaky (len vlastný profil) | `psi/inject/community.js` |
-| Companion server (port 8787) | `psi/companion/server.py` |
-| Companion PWA | `psi/companion/index.html` |
-| QR kód v termináli | `psi/qr.py` |
-| Odhad FPS (hardvér PC vs. požiadavky hry) | `psi/perf.py` |
+| ProtonDB, CheapShark, Steam Store, anti-cheat, deal estimate, playtime snapshots | `psi/core.py` |
+| `Psi` service, CEF injector, instant page attach, bridge `__psiBridge`, auto-update | `psi/service.py`, `psi/cdp.py` |
+| FPS estimate (PC hardware vs. game requirements) | `psi/perf.py` |
+| Steam client: Settings → PSI, library, downloads, theme, fonts, collections | `psi/inject/psi.js` |
+| Store: Linux info, performance, price, buy warning, wishlist badges, styling | `psi/inject/store.js` |
+| Profile: *My week* showcase | `psi/inject/community.js` |
+| Companion server (port 8787) and PWA | `psi/companion/server.py`, `psi/companion/index.html` |
+| QR code in the terminal | `psi/qr.py` |
 
-Dáta: `~/.local/share/psi/` – `config.json`, `cache.json`, `snapshots.json`.
+Data lives in `~/.local/share/psi/` (`config.json`, `cache.json`, `snapshots.json`, `library.json`).
 
-## PSI Companion – bezpečnosť
+## PSI Companion security
 
-* Na PC beží na **http://127.0.0.1:8787**, pre telefón na **LAN IP** PC (privátny rozsah).
-  Nikdy nie na `0.0.0.0` ani na internete. Pri zmene IP sa LAN adresa sama presunie.
-* 6-miestny PIN sa vygeneruje pri prvom štarte. Po prihlásení dostane telefón HttpOnly cookie na 30 dní
-  (v `config.json` je uložený len SHA-256 hash tokenu).
-* PIN: max **5 pokusov za minútu** z jednej IP a 20 celkovo.
-* Kontrola `Host` hlavičky (proti DNS rebindingu), `Origin` pri POST, CSP a `X-Frame-Options`.
-* API je len na čítanie: `/api/week`, `/api/wishlist`, `/api/game/<appid>`, `/api/search?q=`.
-  Jediné POST sú `/api/login` a `/api/logout`.
-* Weby obchodu a komunity dostanú cez most len read-only metódy a nikdy nie PIN.
+- Listens on **http://127.0.0.1:8787** for the PC and on the PC's **LAN IP** (private ranges only)
+  for your phone – never on `0.0.0.0` or the internet.
+- A random 6-digit PIN is generated on first start; after signing in the phone gets an HttpOnly
+  cookie valid for 30 days (only a SHA-256 hash of the token is stored).
+- PIN rate limit: 5 attempts per minute per IP, 20 in total.
+- `Host` header check (DNS rebinding), `Origin` check on POST, CSP and `X-Frame-Options`.
+- Read-only API: `/api/week`, `/api/wishlist`, `/api/game/<appid>`, `/api/search?q=`.
+- Store and community pages only get read-only bridge methods and never the PIN.
 
-Ak máš zapnutý firewall (ufw/firewalld), povoľ port 8787 pre lokálnu sieť:
+If a firewall is enabled, allow the port for your LAN:
 
 ```bash
 sudo ufw allow from 192.168.0.0/16 to any port 8787 proto tcp
 ```
 
-## Voliteľné
+## Optional
 
-* **Achievementy**: do `config.json` doplň `"steam_api_key"` (https://steamcommunity.com/dev/apikey).
-* **Výpredaje**: `"sales"` v `config.json` (predvolené sú oficiálne termíny Valve: zima 2026, jar a leto 2027).
-* **Graf týždňa** sa plní z denných snímok `localconfig.vdf`, takže plný týždeň uvidíš po 7 dňoch behu.
+- **Achievements** – add `"steam_api_key"` to `config.json` (https://steamcommunity.com/dev/apikey).
+- **Sales calendar** – `"sales"` in `config.json` (defaults are Valve's official dates).
+- The weekly chart is built from daily snapshots of `localconfig.vdf`, so a full week appears after 7 days.
 
-## Vývoj
+## Development
 
 ```bash
-PSI_DATA=/tmp/psi-dev python3 -m psi run   # samostatné testovacie dáta
+PSI_DATA=/tmp/psi-dev python3 -m psi run   # separate test data
 ```
+
+## License
+
+MIT

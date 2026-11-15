@@ -9,6 +9,7 @@ import logging
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from collections import Counter
@@ -712,6 +713,51 @@ def notify_deals(psi: Psi) -> int:
     return len(new)
 
 
+REPO = HERE.parent
+
+
+def _git(*args: str, timeout: int = 60) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(REPO), *args], capture_output=True, text=True, timeout=timeout)
+
+
+def check_update(apply: bool = True) -> str:
+    """Nová verzia na GitHube → git pull --ff-only → reštart služby. Vráti stav ako text."""
+    if not (REPO / ".git").exists() or not shutil.which("git"):
+        return "no-git"
+    if _git("fetch", "--quiet", "origin").returncode != 0:
+        return "offline"
+    branch = _git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() or "main"
+    behind = _git("rev-list", "--count", f"HEAD..origin/{branch}").stdout.strip()
+    if not behind.isdigit() or int(behind) == 0:
+        return "up-to-date"
+    if _git("status", "--porcelain", "--untracked-files=no").stdout.strip():
+        log.warning("Aktualizácia PSI preskočená – máš lokálne zmeny v súboroch.")
+        return "local-changes"
+    if not apply:
+        return f"available:{behind}"
+    r = _git("pull", "--ff-only", "--quiet", "origin", branch)
+    if r.returncode != 0:
+        log.warning("Aktualizácia PSI zlyhala: %s", r.stderr.strip()[:200])
+        return "failed"
+    msg = _git("log", "-1", "--pretty=%s").stdout.strip()
+    log.info("PSI aktualizované (%s commitov): %s", behind, msg)
+    _notify("PSI aktualizované", msg or "Nová verzia je nainštalovaná.")
+    CACHE.save(force=True)
+    os.execv(sys.executable, [sys.executable, "-m", "psi", "run"])   # reštart do novej verzie
+    return "restarting"
+
+
+def update_loop() -> None:
+    time.sleep(120)
+    while True:
+        try:
+            if core.features().get("auto_update", True):
+                check_update()
+        except Exception:
+            log.exception("kontrola aktualizácie")
+        time.sleep(6 * 3600)
+
+
 def deal_loop(psi: Psi) -> None:
     time.sleep(90)  # nech sa najprv rozbehne Steam a sieť
     while True:
@@ -731,6 +777,7 @@ def main() -> None:
     psi = Psi()
     threading.Thread(target=snapshot_loop, daemon=True, name="psi-snapshots").start()
     threading.Thread(target=deal_loop, args=(psi,), daemon=True, name="psi-deals").start()
+    threading.Thread(target=update_loop, daemon=True, name="psi-update").start()
     inj = Injector(psi)
     inj.start()
     bw = BrowserWatch(inj)

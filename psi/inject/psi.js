@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.37";
+  const VERSION = "1.39";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -138,6 +138,7 @@
 
   /* ---------------- sekcia v Nastaveniach ---------------- */
   const FEATURES = [
+    ["auto_update", "Automatické aktualizácie", "Raz za 6 hodín skontroluje GitHub a novú verziu PSI nainštaluje sama (dostaneš notifikáciu)."],
     ["rounded", "Moderný vzhľad", "Zaoblené rohy v celom Steame, sklenená karta v obchode a plynulo miznúci obrázok hry v knižnici."],
     ["collections", "Auto-kolekcie v knižnici", "Kolekcie „PSI · Gold“, „PSI · Natívne Linux“, „PSI · Online nepôjde (anti-cheat)“… Aktualizujú sa samy. Vypnutím sa odstránia."],
     ["notify", "Upozornenia na zľavy", "Notifikácia v KDE, keď hra z wishlistu zľavní alebo je na historickom minime."],
@@ -663,7 +664,7 @@
     const rgb = h => [1, 3, 5].map(i => parseInt(String(h).slice(i, i + 2), 16) || 0).join(",");
     const P = `rgba(${rgb(t.panel)},${t.opacity})`, A = t.accent, B = `${t.blur}px`, R = `${t.radius}px`;
     const glass = `background:${P}!important;backdrop-filter:blur(${B})!important;-webkit-backdrop-filter:blur(${B})!important;border-radius:${R}!important`;
-    const vars = `:root{--psi-accent:${A};--psi-panel:${P};--psi-blur:${B};--psi-radius:${R}}`;
+    const vars = `:root{--psi-accent:${A};--psi-panel:${P};--psi-panel-solid:${t.panel};--psi-blur:${B};--psi-radius:${R}}`;
     if (where === "web") return vars + `
   .game_area_purchase_game,.rightcol .block,.leftcol .block,.queue_ctn,.review_box,.user_reviews_summary_bar,.game_area_dlc_section,
   .dlc_page_purchase_dlc_list_block,.game_meta_data .block,.franchise_notice,.DRM_notice,.game_area_already_owned,.early_access_banner,
@@ -908,7 +909,15 @@
     overflow:hidden!important;background:var(--psi-panel,rgba(18,28,44,.62))!important;border:1px solid rgba(255,255,255,.04)}
   ._3WauYi7bNDSGIogMLPVYES{-webkit-mask-image:linear-gradient(to right,#000 35%,transparent 92%),linear-gradient(to bottom,transparent 0%,#000 22%,#000 62%,transparent 100%)!important;
     -webkit-mask-composite:source-in!important;mask-image:linear-gradient(to right,#000 35%,transparent 92%),linear-gradient(to bottom,transparent 0%,#000 22%,#000 62%,transparent 100%)!important;mask-composite:intersect!important}
-  ._25YVDTaClw6Y2COPsU0UaV{height:7px!important}
+  ._25YVDTaClw6Y2COPsU0UaV{height:7px!important;border-radius:99px!important}
+  /* pozadie stránky odvodené z farby témy (predtým sivé Steam pozadie → „bahnité“ karty) */
+  ._1bq4x9pa4-9RLY-dXWUZTp:has(._2sCvZTD6ZTZz3p9_ekH_gI),._2Dd4T78PcCTUVgOtDGFY5j:has(._2sCvZTD6ZTZz3p9_ekH_gI){
+    background:radial-gradient(1200px 500px at 15% 0%,color-mix(in srgb,var(--psi-accent,#1a9fff) 9%,transparent),transparent 70%),
+      color-mix(in srgb,var(--psi-panel-solid,#121c2c) 55%,#05080d)!important}
+  ._1ugNiylO2vKXhirsGocAxa ._3ebCJiEl-ybizhZ4avcFw5{background:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 70%,#ffffff 6%)!important}
+  /* graf siete: jemne mizne k okrajom karty */
+  ._2-AUyaXfJHWP85tZVENytR{-webkit-mask-image:linear-gradient(to right,transparent,#000 12%,#000 88%,transparent),linear-gradient(to top,transparent,#000 30%);
+    -webkit-mask-composite:source-in;mask-image:linear-gradient(to right,transparent,#000 12%,#000 88%,transparent),linear-gradient(to top,transparent,#000 30%);mask-composite:intersect}
   #psi-dlinfo{display:grid;grid-template-columns:auto auto;gap:3px 16px;margin-top:8px;font-size:11.5px;color:#8b929a;white-space:nowrap}
   #psi-dlinfo b{color:#dcdedf;font-weight:600}`;
   const fmtGB = b => b == null ? "?" : b >= 1e12 ? (b / 1e12).toFixed(2) + " TB" : b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : (b / 1e6).toFixed(0) + " MB";
@@ -921,9 +930,11 @@
     if (!loc || !/^\/library\/downloads/.test(loc.pathname || "")) return;
     const doc = g_PopupManager.m_mapPopups.get("SP Desktop_uid0").m_popup.document;
     if (!doc.getElementById("psi-dl")) { const st = doc.createElement("style"); st.id = "psi-dl"; st.textContent = DL_CSS; doc.head.appendChild(st); }
+    for (const tr of doc.querySelectorAll("._25YVDTaClw6Y2COPsU0UaV")) {        // všetky pruhy (hlavný aj v riadkoch)
+      const f = tr.querySelector("._1FnTqlsi2_-TJf1d5apoS6") || tr.firstElementChild;
+      if (f && !f.classList.contains("psi-rainbow")) { f.classList.add("psi-rainbow"); tr.classList.add("psi-rainbow-track"); }
+    }
     const track = doc.querySelector("._25YVDTaClw6Y2COPsU0UaV");
-    const fill = track && (doc.querySelector("._1FnTqlsi2_-TJf1d5apoS6") || track.firstElementChild);
-    if (fill && !fill.classList.contains("psi-rainbow")) { fill.classList.add("psi-rainbow"); track.classList.add("psi-rainbow-track"); }
     if (!track) return;
     // aktuálne sťahovaná položka
     const ds = window.downloadsStore;

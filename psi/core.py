@@ -108,6 +108,7 @@ class JsonStore:
 # Prepínače v Steam → Nastavenia → PSI
 DEFAULT_FEATURES = {
     "rounded": True,        # zaoblené rohy v celom Steame (klient, obchod, komunita)
+    "auto_update": True,    # automatické aktualizácie PSI z GitHubu
     "collections": True,    # auto-kolekcie v knižnici (PSI · Gold, Natívne, anti-cheat…)
     "notify": True,         # KDE notifikácie: zľava / historické minimum na wishliste
     "buy_warning": True,    # varovanie pred kúpou hry, ktorá na Linuxe nepôjde
