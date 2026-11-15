@@ -130,6 +130,42 @@ def set_feature(name: str, value: bool) -> dict:
     return features()
 
 
+# Jazyk PSI: "auto" = podľa jazyka Steamu (Steam slovenčinu nemá – čeština → slovenčina, inak angličtina)
+LANGS = ("auto", "sk", "en")
+
+
+def language() -> str:
+    v = str(config().get("language") or "auto")
+    return v if v in LANGS else "auto"
+
+
+def steam_language() -> str:
+    try:
+        text = (Path.home() / ".steam/registry.vdf").read_text(encoding="utf-8", errors="replace")
+        m = re.search(r'"language"\s+"([^"]+)"', text)
+        return m.group(1).lower() if m else ""
+    except OSError:
+        return ""
+
+
+def ui_lang() -> str:
+    v = language()
+    if v != "auto":
+        return v
+    return "sk" if steam_language() in ("czech", "slovak") else "en"
+
+
+def set_language(v: str) -> str:
+    if v not in LANGS:
+        raise ValueError(f"unknown language {v!r}")
+    CONFIG.update(lambda c: c.__setitem__("language", v))
+    return ui_lang()
+
+
+def tr(sk: str, en: str) -> str:
+    return en if ui_lang() == "en" else sk
+
+
 DEFAULT_THEME = {"accent": "#1a9fff", "panel": "#121c2c", "opacity": 0.62, "blur": 10, "radius": 12}
 
 
@@ -504,7 +540,9 @@ def next_sale(now: float | None = None) -> dict | None:
     for s in sorted(config().get("sales") or DEFAULT_SALES, key=lambda s: s["start"]):
         start, end = _ts(s["start"]), _ts(s["end"])
         if end > now:
-            return {"name": s["name"], "start": start, "end": end, "active": start <= now,
+            name = {"Zimný výpredaj": "Winter Sale", "Jarný výpredaj": "Spring Sale", "Letný výpredaj": "Summer Sale",
+                    "Jesenný výpredaj": "Autumn Sale"}.get(s["name"], s["name"]) if ui_lang() == "en" else s["name"]
+            return {"name": name, "start": start, "end": end, "active": start <= now,
                     "days": max(0, round((start - now) / DAY, 1))}
     return None
 
@@ -536,7 +574,7 @@ def estimate_deal(appid: int, store: dict | None = None) -> dict:
     }
     if out["free"] or not store.get("available", True):
         out.update(estimate=None, estimated=False, verdict="info",
-                   reason="Hra je zadarmo." if out["free"] else "Hra sa momentálne nepredáva.")
+                   reason=tr("Hra je zadarmo.", "The game is free.") if out["free"] else tr("Hra sa momentálne nepredáva.", "The game isn't on sale right now."))
         return out
 
     seen = [h[2] for h in CACHE.history(appid) if h[2] > 0]
@@ -558,24 +596,24 @@ def estimate_deal(appid: int, store: dict | None = None) -> dict:
     disc = out["discount"]
     if out["on_sale"]:
         if best_ever and disc >= best_ever - 5:
-            v, r = "buy", f"−{disc} % je na úrovni historického minima."
+            v, r = "buy", tr(f"−{disc} % je na úrovni historického minima.", f"−{disc} % matches the all-time low.")
         elif sale and sale["active"]:
-            v, r = "buy", f"Prebieha {sale['name'].lower()}, lepšia zľava je nepravdepodobná."
+            v, r = "buy", tr(f"Prebieha {sale['name'].lower()}, lepšia zľava je nepravdepodobná.", f"The {sale['name']} is on – a better price is unlikely.")
         elif days_to_sale is not None and days_to_sale <= 30 and best_ever > disc + 10:
-            v, r = "wait", f"{sale['name']} o {int(days_to_sale)} d, rekord bol −{best_ever} %."
+            v, r = "wait", tr(f"{sale['name']} o {int(days_to_sale)} d, rekord bol −{best_ever} %.", f"{sale['name']} in {int(days_to_sale)} days, the record was −{best_ever} %.")
         elif best_ever > disc + 15:
-            v, r = "wait", f"Hra už bola zľavnená až o {best_ever} %."
+            v, r = "wait", tr(f"Hra už bola zľavnená až o {best_ever} %.", f"It has been up to {best_ever} % off before.")
         else:
-            v, r = "buy", "Dobrá zľava, blízko historického minima."
+            v, r = "buy", tr("Dobrá zľava, blízko historického minima.", "A good discount, close to the all-time low.")
     else:
         if days_to_sale is not None and days_to_sale <= 45 and best_ever:
-            v, r = "wait", f"{sale['name']} o {max(1, int(days_to_sale))} d – odhad ≈ −{out['estimate']} %."
+            v, r = "wait", tr(f"{sale['name']} o {max(1, int(days_to_sale))} d – odhad ≈ −{out['estimate']} %.", f"{sale['name']} in {max(1, int(days_to_sale))} days – expect about −{out['estimate']} %.")
         elif best_ever >= 25:
-            v, r = "wait", f"Bežne sa zľavňuje (až −{best_ever} %)."
+            v, r = "wait", tr(f"Bežne sa zľavňuje (až −{best_ever} %).", f"It goes on sale regularly (up to −{best_ever} %).")
         elif not best_ever:
-            v, r = "buy", "Zľavy zatiaľ nepoznáme – ak ju chceš hrať, nečakaj."
+            v, r = "buy", tr("Zľavy zatiaľ nepoznáme – ak ju chceš hrať, nečakaj.", "No sale history yet – if you want to play it, don't wait.")
         else:
-            v, r = "buy", "Zľavy bývajú malé, čakanie sa veľmi neoplatí."
+            v, r = "buy", tr("Zľavy bývajú malé, čakanie sa veľmi neoplatí.", "Discounts are usually small, waiting isn't worth much.")
     out["verdict"], out["reason"] = v, r
     return out
 

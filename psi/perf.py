@@ -14,7 +14,7 @@ import subprocess
 import threading
 from pathlib import Path
 
-from .core import CACHE, DAY, http_json
+from .core import CACHE, DAY, http_json, tr
 
 # --------------------------------------------------------------------------- grafiky
 # približný relatívny výkon v hrách pri 1080p (RTX 3060 = 100)
@@ -223,7 +223,8 @@ def estimate(appid: int, native: bool = False) -> dict:
     g = hw.get("gpu_score")
     res = {"pc": hw, "req": req, "fps_high": None, "fps_low": None, "preset": None, "level": "unknown", "notes": []}
     if not g or not (mn.get("gpu_score") or rc.get("gpu_score")):
-        res["notes"].append("Požiadavky na grafiku sa nepodarilo porovnať." if g else "Tvoju grafiku nepoznám.")
+        res["notes"].append(tr("Požiadavky na grafiku sa nepodarilo porovnať.", "Couldn't compare the graphics requirements.") if g
+                            else tr("Tvoju grafiku nepoznám.", "Your graphics card isn't in the list yet."))
         return res
     # Proton/DXVK réžia (DX12 cez VKD3D je o niečo náročnejší)
     pf = 1.0 if native else (0.88 if (rc.get("dx") or mn.get("dx")) == "12" else 0.93)
@@ -242,9 +243,9 @@ def estimate(appid: int, native: bool = False) -> dict:
     if cs and creq and cs / creq < 0.85:
         cap = _r5(60 * (cs / creq) ** 0.9)
         res["fps_high"] = min(res["fps_high"], cap)
-        res["notes"].append("Procesor môže brzdiť – je slabší ako odporúčaný.")
+        res["notes"].append(tr("Procesor môže brzdiť – je slabší ako odporúčaný.", "Your CPU may hold it back – it's below the recommended one."))
     if hw.get("ram") and mn.get("ram") and hw["ram"] < mn["ram"]:
-        res["notes"].append(f"Máš menej RAM ({hw['ram']} GB) ako minimum ({mn['ram']} GB).")
+        res["notes"].append(tr(f"Máš menej RAM ({hw['ram']} GB) ako minimum ({mn['ram']} GB).", f"You have less RAM ({hw['ram']} GB) than the minimum ({mn['ram']} GB)."))
     fh = res["fps_high"] or 0
     if fh >= 90:
         res["preset"], res["level"] = "Ultra / vysoké", "great"
@@ -257,5 +258,5 @@ def estimate(appid: int, native: bool = False) -> dict:
     else:
         res["preset"], res["level"] = "Pod minimom", "bad"
     if not native:
-        res["notes"].append("Odhad počíta s malou réžiou Protonu.")
+        res["notes"].append(tr("Odhad počíta s malou réžiou Protonu.", "Includes a small Proton overhead."))
     return res

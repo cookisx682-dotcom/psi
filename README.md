@@ -1,101 +1,84 @@
-# Ψ PSI – Steam enhancer for Linux
+# PSI
 
-PSI is a small Python service (standard library only) that hooks into the Steam client through its
-CEF remote-debugging port, injects its own scripts and styles, and serves **PSI Companion**, a mobile
-web app for your home Wi-Fi.
+I play on Linux and kept opening ProtonDB, AreWeAntiCheatYet and price trackers in a browser
+before every purchase. PSI puts that information straight into the Steam client, and gives Steam a
+cleaner look while it's at it.
 
-> The in-Steam interface is in Slovak; this README and the code base are documented in English.
+It is a small Python service (standard library only). It talks to Steam through its CEF
+remote-debugging port and adds its own scripts and styles. There is no patching of Steam files.
 
-## Features
+## What it does
 
-**Inside Steam** (every feature can be toggled in *Steam → Settings → PSI*):
+In the library, every game gets its ProtonDB rating. A collapsible *About* panel explains what the
+rating means, whether the anti-cheat works on Linux, the Steam Deck status, and a rough FPS range for
+your hardware. PSI can also keep collections like *Gold*, *Native Linux* or *Online blocked
+(anti-cheat)* up to date for you.
 
-- **Library** – ProtonDB medal next to each game, a collapsible *About* panel (description,
-  Linux / anti-cheat / Steam Deck status, FPS estimate), auto-collections such as
-  *PSI · Gold*, *PSI · Native Linux*, *PSI · Online won't work (anti-cheat)*.
-- **Store** – *Play on Linux* (why a game is Gold, anti-cheat status from AreWeAntiCheatYet),
-  *Performance on your PC* (FPS estimate), *Price & discount* (buy now / wait),
-  a warning before buying a game that won't run on Linux, badges on the wishlist page.
-- **Downloads** – rainbow progress bars, downloaded / total size, time remaining and free disk space.
-- **Modern look** – rounded corners everywhere, frosted-glass panels, fading game artwork,
-  custom fonts (system or uploaded).
-- **Theme editor** – accent colour, panel colour and opacity, blur, corner radius,
-  presets and a live window preview.
-- **Custom CSS** – write any CSS in Settings → PSI; it applies to the whole client and store and wins over
-  PSI and Millennium styles.
-- **Millennium themes** – pick a theme from [steambrew.app](https://steambrew.app/themes), install it from a
-  GitHub URL or drop it into `~/.local/share/psi/millennium/`. Only the theme's CSS is used (assets are
-  inlined); theme JavaScript is never executed.
-- **Instant styling** – PSI attaches to every new store page the moment it is created,
-  so styles are in place before the first paint.
-- **KDE notifications** when a wishlisted game goes on sale.
-- **Profile** – a *My week* showcase with playtime and badges.
-- **Automatic updates** – every 6 hours PSI checks this repository and updates itself.
+In the store, a game page shows the same Linux information, the price history, and a buy-now /
+wait hint. If a game won't run on Linux, you get a warning before you add it to the cart.
+Wishlist items get small rating badges, and KDE notifies you when one of them goes on sale.
 
-**PSI Companion** – a PWA for your phone: weekly playtime, wishlist with deal estimates and
-countdowns, game search with ProtonDB data. Read-only, PIN-protected, LAN only.
+For the look, there are rounded corners, a theme editor (accent colour, panel colour, blur, corner
+radius), custom fonts, your own CSS, and Millennium themes (CSS only, their JavaScript never runs).
+The downloads page shows how much is left, the time remaining and the free disk space.
 
-## Installation
+PSI follows Steam's language (English or Slovak) and you can switch it under
+*Steam → Settings → PSI*, where every feature has its own toggle. It updates itself from this
+repository every 6 hours.
+
+**PSI Companion** is an optional phone page on your home Wi-Fi with your week of playtime and your
+wishlist. It is read-only and protected by a PIN.
+
+The FPS numbers are an estimate built from the game's listed requirements and a table of GPU/CPU
+scores, not a benchmark. Treat them as "will this run", not as a promise.
+
+## Install
 
 ```bash
 git clone https://github.com/cookisx682-dotcom/psi.git ~/psi
-~/psi/bin/psi install      # systemd user service + .cef-enable-remote-debugging + ~/.local/bin/psi
+~/psi/bin/psi install
 ```
 
-Then restart Steam. Steam's CEF debugger uses port **8080** (IPv4 `127.0.0.1` or IPv6 `[::1]`;
-PSI tries both), so nothing else may listen on that port.
+`psi install` sets up a systemd user service, enables Steam's debug port
+(`.cef-enable-remote-debugging`) and links the `psi` command into `~/.local/bin`. Restart Steam
+afterwards. Steam's debugger listens on port 8080, so nothing else can use that port.
 
 ```bash
-psi --companion            # address, PIN and QR code for your phone
+psi status                 # is everything connected?
+psi update                 # check for a new version now
+psi --companion            # phone address, PIN and QR code
 psi --companion --new-pin  # new PIN, signs out all phones
-psi status
-psi update                 # check GitHub for a new version right now
 journalctl --user -u psi -f
 ```
 
-## Project layout
+Optional settings in `~/.local/share/psi/config.json`: `"steam_api_key"` for achievements, and
+`"sales"` to override the sale calendar (Valve's dates are the default).
 
-| Part | File |
+## Where things are
+
+| | |
 |---|---|
-| ProtonDB, CheapShark, Steam Store, anti-cheat, deal estimate, playtime snapshots | `psi/core.py` |
-| `Psi` service, CEF injector, instant page attach, bridge `__psiBridge`, auto-update | `psi/service.py`, `psi/cdp.py` |
-| FPS estimate (PC hardware vs. game requirements) | `psi/perf.py` |
-| Steam client: Settings → PSI, library, downloads, theme, fonts, collections | `psi/inject/psi.js` |
-| Store: Linux info, performance, price, buy warning, wishlist badges, styling | `psi/inject/store.js` |
-| Profile: *My week* showcase | `psi/inject/community.js` |
-| Companion server (port 8787) and PWA | `psi/companion/server.py`, `psi/companion/index.html` |
-| QR code in the terminal | `psi/qr.py` |
-| Millennium theme loader (skin.json patches, CSS only) | `psi/millennium.py` |
+| Service, Steam connection, auto-update | `psi/service.py`, `psi/cdp.py` |
+| ProtonDB, store data, prices, anti-cheat, config | `psi/core.py` |
+| FPS estimate | `psi/perf.py` |
+| Steam client: settings page, library, downloads, look | `psi/inject/psi.js` |
+| Store and profile pages | `psi/inject/store.js`, `psi/inject/community.js` |
+| Millennium themes | `psi/millennium.py` |
+| Companion | `psi/companion/` |
 
-Data lives in `~/.local/share/psi/` (`config.json`, `cache.json`, `snapshots.json`, `library.json`).
+Your data stays in `~/.local/share/psi/`.
 
-## PSI Companion security
+## Companion security
 
-- Listens on **http://127.0.0.1:8787** for the PC and on the PC's **LAN IP** (private ranges only)
-  for your phone – never on `0.0.0.0` or the internet.
-- A random 6-digit PIN is generated on first start; after signing in the phone gets an HttpOnly
-  cookie valid for 30 days (only a SHA-256 hash of the token is stored).
-- PIN rate limit: 5 attempts per minute per IP, 20 in total.
-- `Host` header check (DNS rebinding), `Origin` check on POST, CSP and `X-Frame-Options`.
-- Read-only API: `/api/week`, `/api/wishlist`, `/api/game/<appid>`, `/api/search?q=`.
-- Store and community pages only get read-only bridge methods and never the PIN.
+The Companion listens on `127.0.0.1:8787` and on your LAN address only (never `0.0.0.0`). Phones sign
+in with a 6-digit PIN that is rate-limited. After that they get a 30-day HttpOnly cookie, and only
+its hash is stored. It checks the `Host` and `Origin` headers and the API can't change anything.
+Store and profile pages only get read-only methods and never see the PIN.
 
-If a firewall is enabled, allow the port for your LAN:
+If you use a firewall:
 
 ```bash
 sudo ufw allow from 192.168.0.0/16 to any port 8787 proto tcp
-```
-
-## Optional
-
-- **Achievements** – add `"steam_api_key"` to `config.json` (https://steamcommunity.com/dev/apikey).
-- **Sales calendar** – `"sales"` in `config.json` (defaults are Valve's official dates).
-- The weekly chart is built from daily snapshots of `localconfig.vdf`, so a full week appears after 7 days.
-
-## Development
-
-```bash
-PSI_DATA=/tmp/psi-dev python3 -m psi run   # separate test data
 ```
 
 ## License

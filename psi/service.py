@@ -263,7 +263,12 @@ class Psi:
         return {"url": c.url, "matrix": ["".join("1" if m else "0" for m in row) for row in QR(c.url).matrix(0)]}
 
     def features(self) -> dict:
-        return core.features()
+        return {**core.features(), "lang": core.ui_lang(), "lang_setting": core.language()}
+
+    def set_language(self, value: str) -> dict:
+        core.set_language(value)
+        self._changed()
+        return self.features()
 
     def set_feature(self, name: str, value: bool) -> dict:
         f = core.set_feature(name, value)
@@ -444,7 +449,7 @@ class Psi:
 BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
-               "companion_qr", "features", "set_feature", "new_pin", "theme", "set_theme", "disk", "save_library",
+               "companion_qr", "features", "set_feature", "set_language", "new_pin", "theme", "set_theme", "disk", "save_library",
                "millennium", "millennium_set", "millennium_patches", "millennium_install", "millennium_open",
                "custom_css", "set_custom_css"},
     "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme", "custom_css"},
@@ -485,7 +490,7 @@ class Injector(threading.Thread):
         body = "\n;\n".join((INJECT / f).read_text(encoding="utf-8") for f in files)
         if kind == "web":
             # štýly sa aplikujú synchrónne hneď na začiatku stránky – bez čakania na most
-            boot = {"features": core.features(), "theme": core.theme(), "custom_css": str(config().get("custom_css") or "")}
+            boot = {"features": {**core.features(), "lang": core.ui_lang()}, "theme": core.theme(), "custom_css": str(config().get("custom_css") or "")}
             try:
                 from . import millennium as mi
                 boot["millennium"] = mi.patches("web")
@@ -759,12 +764,12 @@ def notify_deals(psi: Psi) -> int:
     if len(new) <= 3:
         for it, low in new:
             ends = dt.datetime.fromtimestamp(it["discount_end"]).strftime("%-d. %-m. %H:%M") if it.get("discount_end") else ""
-            body = (("🏆 Historické minimum! " if low else "") + f"{it.get('price_fmt') or ''} (pôvodne {it.get('price_full_fmt') or ''})"
-                    + (f" · končí {ends}" if ends else ""))
+            body = ((core.tr("🏆 Historické minimum! ", "🏆 All-time low! ") if low else "") + f"{it.get('price_fmt') or ''} ({core.tr('pôvodne', 'was')} {it.get('price_full_fmt') or ''})"
+                    + (f" · {core.tr('končí', 'ends')} {ends}" if ends else ""))
             _notify(f"−{it['discount']} % · {it['name']}", body)
     else:
         lines = [f"−{it['discount']} % {it['name']}" + (" 🏆" if low else "") for it, low in new[:6]]
-        _notify(f"{len(new)} hier z wishlistu je v zľave", "\n".join(lines))
+        _notify(core.tr(f"{len(new)} hier z wishlistu je v zľave", f"{len(new)} wishlisted games are on sale"), "\n".join(lines))
     return len(new)
 
 
@@ -796,7 +801,7 @@ def check_update(apply: bool = True) -> str:
         return "failed"
     msg = _git("log", "-1", "--pretty=%s").stdout.strip()
     log.info("PSI aktualizované (%s commitov): %s", behind, msg)
-    _notify("PSI aktualizované", msg or "Nová verzia je nainštalovaná.")
+    _notify(core.tr("PSI aktualizované", "PSI updated"), msg or core.tr("Nová verzia je nainštalovaná.", "A new version is installed."))
     CACHE.save(force=True)
     os.execv(sys.executable, [sys.executable, "-m", "psi", "run"])   # reštart do novej verzie
     return "restarting"

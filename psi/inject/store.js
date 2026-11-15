@@ -2,6 +2,9 @@
  * ProtonDB medaila, živý odpočet konca zľavy, odhad zľavy a odporúčanie kúp/počkaj. */
 (function () {
   "use strict";
+  // jazyk: služba ho pošle v __PSI_BOOT, inak podľa jazyka stránky Steamu
+  const LANG = ((window.__PSI_BOOT || {}).features || {}).lang || (/^(sk|cs)/.test(document.documentElement.lang || "") ? "sk" : "en");
+  const tr = (sk, en) => LANG === "en" ? en : sk;
   /* most – spoločný pre store.js aj community.js */
   if (!window.__psiCall) {
     const pending = new Map(); let seq = 0;
@@ -57,15 +60,14 @@
   .game_area_purchase_game,.rightcol .block,.leftcol .block,.queue_ctn,.review_box,.user_reviews_summary_bar,
   .game_area_dlc_section,.dlc_page_purchase_dlc_list_block,.game_meta_data .block,.franchise_notice,.DRM_notice,
   .game_area_already_owned,.early_access_banner{
-    background:rgba(18,28,44,.62)!important;border:1px solid rgba(255,255,255,.035)!important;
-    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:12px}
+    background:rgba(18,28,44,.62)!important;border:1px solid rgba(255,255,255,.035)!important;border-radius:12px}
   .rightcol .block .block_title,.rightcol .block .block_content,.rightcol .block .block_content_inner,
   .game_area_purchase_game .game_area_purchase_platform,.queue_actions_ctn{background:transparent!important}
   #game_highlights::before{background:rgba(18,28,44,.62)!important}
   #game_highlights .rightcol .glance_ctn{background:transparent!important;box-shadow:none!important;border:0!important;
     position:relative;isolation:isolate;overflow:visible}
   #game_highlights .rightcol .glance_ctn::before{content:"";position:absolute;inset:-12px -12px -12px;z-index:-1;pointer-events:none;
-    background:rgba(10,18,30,.42);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    background:rgba(10,18,30,.32);
     -webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent),linear-gradient(to bottom,transparent,#000 22px,#000 calc(100% - 22px),transparent);
     -webkit-mask-composite:source-in;mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent),linear-gradient(to bottom,transparent,#000 22px,#000 calc(100% - 22px),transparent);
     mask-composite:intersect}
@@ -73,7 +75,7 @@
   #game_highlights{position:relative;isolation:isolate}
   #game_highlights::before{content:"";position:absolute;inset:-16px -16px -14px;z-index:-1;border-radius:20px;pointer-events:none;
     background:linear-gradient(135deg,rgba(62,98,128,.38),rgba(27,40,56,.30) 55%,rgba(42,71,94,.34));
-    backdrop-filter:blur(14px) saturate(1.25);-webkit-backdrop-filter:blur(14px) saturate(1.25);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border:0;box-shadow:0 14px 44px rgba(0,0,0,.35)}
   #game_highlights .rightcol{padding-left:4px}
   /* nákupné bloky: cena, Add to Cart, View Info */
@@ -86,7 +88,7 @@
   [role="navigation"][aria-label="Store menu"] a,[role="navigation"][aria-label="Store menu"] button{border-radius:8px!important}
   /* horný panel obchodu: priehľadné zaoblené sklo namiesto pruhu cez celú šírku */
   :has(> [role="navigation"][aria-label="Store menu"]){background:rgba(18,28,44,.42)!important;
-    backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border-radius:14px!important;margin:6px 16px 0!important;border:1px solid rgba(255,255,255,.05)!important;
     box-shadow:0 8px 28px rgba(0,0,0,.28)!important}
   [role="navigation"][aria-label="Store menu"],[role="navigation"][aria-label="Store menu"] > *{background-color:transparent!important}
@@ -136,22 +138,24 @@
   function psiThemeCss(t, where) {
     const rgb = h => [1, 3, 5].map(i => parseInt(String(h).slice(i, i + 2), 16) || 0).join(",");
     const P = `rgba(${rgb(t.panel)},${t.opacity})`, A = t.accent, B = `${t.blur}px`, R = `${t.radius}px`;
+    // sklo (rozmazanie) len na pár miestach – karta O hre, hlavná karta v obchode, lišta obchodu; inde plná plocha
     const glass = `background:${P}!important;backdrop-filter:blur(${B})!important;-webkit-backdrop-filter:blur(${B})!important;border-radius:${R}!important`;
-    const vars = `:root{--psi-accent:${A};--psi-panel:${P};--psi-blur:${B};--psi-radius:${R}}`;
+    const solid = `background:${P}!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-radius:${R}!important`;
+    const vars = `:root{--psi-accent:${A};--psi-panel:${P};--psi-blur:${B};--psi-radius:${R};--psi-text:color-mix(in srgb,#ffffff 94%,${A});--psi-text2:color-mix(in srgb,#d6dbe0 88%,${A});--psi-mut:color-mix(in srgb,#8f98a0 85%,${A});--psi-faint:color-mix(in srgb,#5b6170 80%,${A})}`;
     if (where === "web") return vars + `
   .game_area_purchase_game,.rightcol .block,.leftcol .block,.queue_ctn,.review_box,.user_reviews_summary_bar,.game_area_dlc_section,
   .dlc_page_purchase_dlc_list_block,.game_meta_data .block,.franchise_notice,.DRM_notice,.game_area_already_owned,.early_access_banner,
-  .profile_customization{${glass}}
+  .profile_customization{${solid}}
   #game_highlights::before{background:${P}!important;backdrop-filter:blur(${B})!important;border-radius:calc(${R} + 8px)!important}
   :has(> [role="navigation"][aria-label="Store menu"]){background:rgba(${rgb(t.panel)},${Math.max(0.12, t.opacity - 0.2)})!important;
-    backdrop-filter:blur(calc(${B} + 6px)) saturate(1.3)!important;border-radius:calc(${R} + 2px)!important}
+    backdrop-filter:blur(calc(${B} + 4px))!important;border-radius:calc(${R} + 2px)!important}
   form[role="search"]{border-radius:${R}!important}
   form[role="search"] button,[role="navigation"][aria-label="Store menu"] a[href*="/cart"],.btn_blue_steamui,.btnv6_blue_blue_innerfade{background:${A}!important}`;
     return vars + `
   .psi-libcard{${glass};border:1px solid rgba(255,255,255,.04)!important}
   .psi-pcard{border-radius:calc(${R} - 2px)!important}
-  #psi-settings .psi-card{${glass}}
-  #psi-settings .psi-sw.on{background:${A}!important;box-shadow:0 0 12px ${A}66!important}
+  #psi-settings .psi-card{${solid}}
+  #psi-settings .psi-sw.on{background:${A}!important;box-shadow:none!important}
   .DialogButton.Primary,._3ydigb6zZAjJ0JCDgHwSYA,._2Szzh5sKyGgnLUR870zbDE._5wILZhsLODVwGfcJ0hKmJ{background:${A}!important}
   ._1FnJ6dPuknQFQ2RTpKTI16,._2r4TK4BAuU-J4FuF_O7v_5{border-radius:${R}!important}`;
   }
@@ -234,13 +238,13 @@
     const e = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
     const ov = document.createElement("div");
     ov.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center";
-    ov.innerHTML = `<div style="max-width:460px;background:#1e2a38;border:1px solid #d94126;border-radius:12px;padding:22px 24px;color:#c6d4df;font:14px/1.5 'Motiva Sans',Arial,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.6)">
-      <div style="font-size:19px;color:#fff;margin-bottom:10px">⚠ Táto hra na Linuxe nemusí ísť</div>
+    ov.innerHTML = `<div style="max-width:460px;background:#1e2a38;border:1px solid #d94126;border-radius:12px;padding:22px 24px;color:var(--psi-text2,#c6d4df);font:14px/1.5 'Motiva Sans',Arial,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+      <div style="font-size:19px;color:var(--psi-text,#fff);margin-bottom:10px">⚠ ${tr("Táto hra na Linuxe nemusí ísť", "This game may not work on Linux")}</div>
       ${reasons.map(r => `<div style="margin:4px 0">✕ ${e(r)}</div>`).join("")}
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
-        <a class="psi-no" style="cursor:pointer;padding:0 14px;line-height:30px;border-radius:8px;color:#67c1f5;background:rgba(103,193,245,.2)">Zrušiť</a>
-        <a class="psi-yes" style="cursor:pointer;padding:0 14px;line-height:30px;border-radius:8px;color:#d2efa9;background:linear-gradient(to right,#75b022 5%,#588a1b 95%)">Aj tak pokračovať</a>
-      </div><div style="font-size:11px;color:#56707f;margin-top:10px">PSI · ProtonDB, AreWeAntiCheatYet</div></div>`;
+        <a class="psi-no" style="cursor:pointer;padding:0 14px;line-height:30px;border-radius:8px;color:#67c1f5;background:rgba(103,193,245,.2)">${tr("Zrušiť", "Cancel")}</a>
+        <a class="psi-yes" style="cursor:pointer;padding:0 14px;line-height:30px;border-radius:8px;color:#d2efa9;background:linear-gradient(to right,#75b022 5%,#588a1b 95%)">${tr("Aj tak pokračovať", "Continue anyway")}</a>
+      </div><div style="font-size:11px;color:var(--psi-faint,#56707f);margin-top:10px">PSI · ProtonDB, AreWeAntiCheatYet</div></div>`;
     document.body.appendChild(ov);
     ov.querySelector(".psi-no").onclick = () => ov.remove();
     ov.addEventListener("click", ev => { if (ev.target === ov) ov.remove(); });
@@ -248,14 +252,14 @@
   }
   function psiReasons(d) {
     const r = [];
-    if (!d.native && d.tier === "borked") r.push("Podľa ProtonDB sa na Linuxe nespustí (Borked).");
-    if (d.ac === "Denied" || d.ac === "Broken") r.push(`${(d.anticheats || []).join(", ")} – do online hier ťa na Linuxe nepustí.`);
+    if (!d.native && d.tier === "borked") r.push(tr("Podľa ProtonDB sa na Linuxe nespustí (Borked).", "According to ProtonDB it won't start on Linux (Borked)."));
+    if (d.ac === "Denied" || d.ac === "Broken") r.push(`${(d.anticheats || []).join(", ")} – ${tr("do online hier ťa na Linuxe nepustí.", "blocks online play on Linux.")}`);
     return r;
   }
   /* ---------------- wishlist: odznaky ProtonDB a anti-cheat ---------------- */
   if (location.hostname === "store.steampowered.com" && /^\/wishlist/.test(location.pathname) && !window.__psiWishlist) {
     window.__psiWishlist = true;
-    const WL_T = {native: ["#008000", "#fff", "Natívne"], platinum: ["#b4c7dc", "#14161b", "Platinum"], gold: ["#cfb53b", "#14161b", "Gold"],
+    const WL_T = {native: ["#008000", "#fff", tr("Natívne", "Native")], platinum: ["#b4c7dc", "#14161b", "Platinum"], gold: ["#cfb53b", "#14161b", "Gold"],
       silver: ["#a6a6a6", "#14161b", "Silver"], bronze: ["#cd7f32", "#14161b", "Bronze"], borked: ["#e02424", "#fff", "Borked"], pending: ["#444b5e", "#dfe3ee", "?"]};
     const known = new Map();
     let busy = false, on = null;
@@ -282,8 +286,8 @@
         const box = document.createElement("div");
         box.className = "psi-wl";
         box.style.cssText = "position:absolute;left:6px;bottom:6px;display:flex;gap:4px;flex-wrap:wrap;z-index:3;pointer-events:none";
-        box.innerHTML = pill(bg, fg, label, "ProtonDB") + (bad ? pill("#d94126", "#fff", "⊘ Online nepôjde", (d.anticheats || []).join(", ")) : "")
-          + (d.deck === 3 ? pill("rgba(23,26,33,.85)", "#59bf40", "Deck ✓", "Steam Deck overené") : "");
+        box.innerHTML = pill(bg, fg, label, "ProtonDB") + (bad ? pill("#d94126", "#fff", tr("⊘ Online nepôjde", "⊘ No online"), (d.anticheats || []).join(", ")) : "")
+          + (d.deck === 3 ? pill("rgba(23,26,33,.85)", "#59bf40", "Deck ✓", tr("Steam Deck overené", "Steam Deck Verified")) : "");
         if (getComputedStyle(link).position === "static") link.style.position = "relative";
         link.appendChild(box);
       }
@@ -328,15 +332,15 @@
   /* ---------------- karta ProtonDB (rovnaká v knižnici aj v obchode) ---------------- */
   const TIER_BAND = {native: ["#008000", "#fff", "NATIVE"], platinum: ["#b4c7dc", "#14161b", "PLATINUM"], gold: ["#cfb53b", "#14161b", "GOLD"],
     silver: ["#a6a6a6", "#14161b", "SILVER"], bronze: ["#cd7f32", "#14161b", "BRONZE"], borked: ["#e02424", "#fff", "BORKED"], pending: ["#444b5e", "#dfe3ee", "PENDING"]};
-  const DECK_INFO = {3: ["#59bf40", "M11 18.5l4.5 4.5 9-10", "Steam Deck: overené"], 2: ["#ffc82c", "M18 16v8M18 11.5v.5", "Steam Deck: hrateľné"],
-    1: ["#8b929a", "M11 25L25 11", "Steam Deck: nepodporované"], 0: ["#8b929a", "M14.5 14a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.2-1.5 2.3v.5M18 24.5v.5", "Steam Deck: neznáme"]};
+  const DECK_INFO = () => ({3: ["#59bf40", "M11 18.5l4.5 4.5 9-10", tr("Steam Deck: overené", "Steam Deck: Verified")], 2: ["#ffc82c", "M18 16v8M18 11.5v.5", tr("Steam Deck: hrateľné", "Steam Deck: Playable")],
+    1: ["#8b929a", "M11 25L25 11", tr("Steam Deck: nepodporované", "Steam Deck: Unsupported")], 0: ["#8b929a", "M14.5 14a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.2-1.5 2.3v.5M18 24.5v.5", tr("Steam Deck: neznáme", "Steam Deck: Unknown")]});
   function deckIcon(cat, s = 30) {
-    const [c, path, t] = DECK_INFO[cat] || DECK_INFO[0];
+    const di = DECK_INFO(), [c, path, t] = di[cat] || di[0];
     return `<svg width="${s}" height="${s}" viewBox="0 0 36 36"><title>${t}</title><circle cx="18" cy="18" r="15" fill="none" stroke="${c}" stroke-width="2.6"/><path d="${path}" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   }
   function tuxIcon(native, s = 30) {
     const c = native ? "#22c55e" : "#5b6170";
-    return `<svg width="${s}" height="${s}" viewBox="0 0 36 36"><title>${native ? "Natívna Linux verzia" : "Bez natívnej Linux verzie (beží cez Proton)"}</title>
+    return `<svg width="${s}" height="${s}" viewBox="0 0 36 36"><title>${native ? tr("Natívna Linux verzia", "Native Linux version") : tr("Bez natívnej Linux verzie (beží cez Proton)", "No native Linux version (runs through Proton)")}</title>
       <rect x="1.5" y="1.5" width="33" height="33" rx="7" fill="${native ? "rgba(34,197,94,.15)" : "none"}" stroke="${c}" stroke-width="2.4"/>
       <ellipse cx="18" cy="20" rx="7.5" ry="10" fill="${c}"/><ellipse cx="18" cy="22.5" rx="4.6" ry="6.6" fill="#f3f4f6"/>
       <circle cx="15.6" cy="13.5" r="1.3" fill="#111"/><circle cx="20.4" cy="13.5" r="1.3" fill="#111"/><path d="M16 16.5h4l-2 2.2z" fill="#f59e0b"/></svg>`;
@@ -345,35 +349,38 @@
     const p = info.protondb || {}, tier = info.native ? "native" : (p.tier || "pending");
     const [bg, fg, label] = TIER_BAND[tier] || TIER_BAND.pending;
     const pt = TIERS[p.tier] || TIERS.pending;
-    const meta = [p.reports ? `${p.reports} hlásení` : "zatiaľ bez hlásení",
+    const meta = [p.reports ? tr(`${p.reports} hlásení`, `${p.reports} reports`) : tr("zatiaľ bez hlásení", "no reports yet"),
       p.trending && p.trending !== p.tier && TIERS[p.trending] ? `trend ${TIERS[p.trending].label}` : ""].filter(Boolean).join(" · ");
     return `<div class="psi-pcard" style="width:270px;flex:none;border-radius:6px;overflow:hidden;background:#1e222b;border:1px solid rgba(255,255,255,.08);font-family:'Motiva Sans',Arial,sans-serif">
       <div style="background:${bg};color:${fg};text-align:center;font-size:19px;font-weight:600;letter-spacing:.08em;padding:9px 6px">${label}</div>
       <div style="display:flex;justify-content:center;align-items:center;gap:18px;padding:12px 10px 8px">
         <span title="ProtonDB: ${pt.label}">${medal(p.tier || "pending", 26)}</span>${deckIcon(info.deck)}${tuxIcon(info.native)}
       </div>
-      <div style="text-align:center;color:#8b929a;font-size:12px;padding:0 10px 11px">${esc(meta)} · <span class="psi-pdb" style="color:#22d3ee;cursor:pointer">ProtonDB ↗</span></div>
+      <div style="text-align:center;color:var(--psi-mut,#8b929a);font-size:12px;padding:0 10px 11px">${esc(meta)} · <span class="psi-pdb" style="color:var(--psi-accent,#1a9fff);cursor:pointer">ProtonDB ↗</span></div>
     </div>`;
   }
+
   /* ---------------- vysvetlenie: prečo Gold, anti-cheat, Deck ---------------- */
-  const TIER_WHY = {
-    native: "Hra má natívnu Linux verziu – Proton netreba.",
-    platinum: "Beží perfektne hneď po inštalácii, nič netreba nastavovať.",
-    gold: "Beží perfektne, ale niekedy po menšej úprave (iná verzia Protonu alebo spúšťací parameter).",
-    silver: "Hrateľná, ale s menšími chybami (grafika, zvuk, občasný pád).",
-    bronze: "Spustí sa, ale má vážne problémy – hranie môže byť nepríjemné.",
-    borked: "Nespustí sa alebo je nehrateľná.",
-    pending: "Zatiaľ málo hlásení na spoľahlivé hodnotenie.",
-  };
-  const CONF = {strong: "vysoká", good: "dobrá", moderate: "stredná", low: "nízka", inadequate: "nedostatočná"};
-  const AC = {
-    Supported: ["ok", "Anti-cheat na Linuxe funguje – online hranie je v poriadku."],
-    Running: ["warn", "Anti-cheat beží, ale vývojár Linux oficiálne nepodporuje – môže sa to kedykoľvek zmeniť."],
-    Planned: ["warn", "Podpora Linuxu sa plánuje – online zatiaľ nemusí fungovať."],
-    Broken: ["bad", "Anti-cheat na Linuxe nefunguje – do online hier ťa nepustí alebo vyhodí."],
-    Denied: ["bad", "Vývojár Linux zablokoval – do online hier ťa nepustí (offline režim, ak ho hra má, ide)."],
-  };
-  const DECK_TXT = {3: ["ok", "Steam Deck: overené"], 2: ["warn", "Steam Deck: hrateľné (drobné obmedzenia)"], 1: ["bad", "Steam Deck: nepodporované"], 0: ["info", "Steam Deck: zatiaľ nehodnotené"]};
+  const TIER_WHY = () => ({
+    native: tr("Hra má natívnu Linux verziu – Proton netreba.", "Has a native Linux version – no Proton needed."),
+    platinum: tr("Beží perfektne hneď po inštalácii, nič netreba nastavovať.", "Runs perfectly out of the box, nothing to set up."),
+    gold: tr("Beží perfektne, ale niekedy po menšej úprave (iná verzia Protonu alebo spúšťací parameter).", "Runs perfectly, sometimes after a small tweak (another Proton version or a launch option)."),
+    silver: tr("Hrateľná, ale s menšími chybami (grafika, zvuk, občasný pád).", "Playable, with minor issues (graphics, audio, an occasional crash)."),
+    bronze: tr("Spustí sa, ale má vážne problémy – hranie môže byť nepríjemné.", "Starts, but has serious issues – playing may be unpleasant."),
+    borked: tr("Nespustí sa alebo je nehrateľná.", "Won't start or isn't playable."),
+    pending: tr("Zatiaľ málo hlásení na spoľahlivé hodnotenie.", "Not enough reports for a reliable rating yet."),
+  });
+  const CONF = () => LANG === "en" ? {strong: "high", good: "good", moderate: "moderate", low: "low", inadequate: "too low"}
+    : {strong: "vysoká", good: "dobrá", moderate: "stredná", low: "nízka", inadequate: "nedostatočná"};
+  const AC = () => ({
+    Supported: ["ok", tr("Anti-cheat na Linuxe funguje – online hranie je v poriadku.", "Anti-cheat works on Linux – online play is fine.")],
+    Running: ["warn", tr("Anti-cheat beží, ale vývojár Linux oficiálne nepodporuje – môže sa to kedykoľvek zmeniť.", "Anti-cheat runs, but the developer doesn't officially support Linux – that can change any time.")],
+    Planned: ["warn", tr("Podpora Linuxu sa plánuje – online zatiaľ nemusí fungovať.", "Linux support is planned – online may not work yet.")],
+    Broken: ["bad", tr("Anti-cheat na Linuxe nefunguje – do online hier ťa nepustí alebo vyhodí.", "Anti-cheat doesn't work on Linux – online modes won't let you in or will kick you.")],
+    Denied: ["bad", tr("Vývojár Linux zablokoval – do online hier ťa nepustí (offline režim, ak ho hra má, ide).", "The developer blocks Linux – no online play (offline mode works if the game has one).")],
+  });
+  const DECK_TXT = () => ({3: ["ok", tr("Steam Deck: overené", "Steam Deck: Verified")], 2: ["warn", tr("Steam Deck: hrateľné (drobné obmedzenia)", "Steam Deck: Playable (minor limits)")],
+    1: ["bad", tr("Steam Deck: nepodporované", "Steam Deck: Unsupported")], 0: ["info", tr("Steam Deck: zatiaľ nehodnotené", "Steam Deck: not rated yet")]});
   const ICO = {
     ok: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="#a4d007" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     warn: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2l6.5 12h-13z" fill="none" stroke="#e5a83a" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 6.5v3.5M8 12v.3" stroke="#e5a83a" stroke-width="1.8" stroke-linecap="round"/></svg>',
@@ -387,45 +394,50 @@
     const col = {great: "#59bf40", good: "#a4d007", ok: "#e5a83a", low: "#e5a83a", bad: "#d94126"}[p.level] || "#8f98a0";
     const cmp = (mine, need) => mine == null || need == null ? "info" : mine >= need ? "ok" : "bad";
     const ref = rc.gpu_score ? rc : mn;
-    const fps = n => n == null ? "?" : n >= 144 ? "144+" : String(n);
+    // odhad nie je meranie → ukazujeme rozsah, nie jedno presné číslo
+    const r5 = x => Math.max(5, Math.round(x / 5) * 5);
+    const fps = n => n == null ? "?" : n >= 144 ? "144+" : `${r5(n * 0.8)}–${r5(n * 1.15)}`;
+    const feel = {great: tr("plynulo", "smooth"), good: tr("plynulo", "smooth"), ok: tr("hrateľne", "playable"), low: tr("slabo", "rough"), bad: tr("pod minimom", "below minimum")}[p.level] || "";
+    const preset = {great: tr("Ultra / vysoké", "Ultra / high"), good: tr("Vysoké", "High"), ok: tr("Stredné", "Medium"), low: tr("Nízke", "Low"), bad: tr("Nízke", "Low")}[p.level] || "";
     const row = (lvl, label, mine, need) => `<div style="display:flex;gap:10px;align-items:flex-start;padding:4px 0;line-height:1.4">
-      <span style="flex:none;margin-top:2px">${ICO[lvl]}</span><span style="min-width:74px;color:#8f98a0">${label}</span>
-      <span><span style="color:#fff">${esc(mine)}</span>${need ? `<span style="color:#8f98a0"> · ${ref === rc ? "odporúčané" : "minimum"}: ${esc(need)}</span>` : ""}</span></div>`;
+      <span style="flex:none;margin-top:2px">${ICO[lvl]}</span><span style="min-width:74px;color:var(--psi-mut,#8f98a0)">${label}</span>
+      <span><span style="color:var(--psi-text,#fff)">${esc(mine)}</span>${need ? `<span style="color:var(--psi-mut,#8f98a0)"> · ${ref === rc ? tr("odporúčané", "recommended") : "minimum"}: ${esc(need)}</span>` : ""}</span></div>`;
     const head = p.fps_high ? `<div style="display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
-        <div><div style="font-size:34px;line-height:1;color:${col};font-weight:300">≈ ${fps(p.fps_high)} <span style="font-size:16px">FPS</span></div>
-          <div style="font-size:12.5px;color:#8f98a0;margin-top:4px">${esc(p.preset || "")} detaily · 1080p</div></div>
-        ${p.fps_low ? `<div><div style="font-size:20px;line-height:1;color:#dcdedf">≈ ${fps(p.fps_low)} FPS</div><div style="font-size:12.5px;color:#8f98a0;margin-top:4px">nízke detaily</div></div>` : ""}
-      </div>` : `<div style="color:#8f98a0;margin-bottom:8px">Odhad nie je k dispozícii – hra neuvádza porovnateľné požiadavky.</div>`;
+        <div><div style="font-size:30px;line-height:1;color:${col};font-weight:300">${fps(p.fps_high)} <span style="font-size:15px">FPS</span></div>
+          <div style="font-size:12.5px;color:var(--psi-mut,#8f98a0);margin-top:4px">${esc(preset)} ${tr("detaily", "settings")} · 1080p · ${esc(feel)}</div></div>
+        ${p.fps_low ? `<div><div style="font-size:18px;line-height:1;color:var(--psi-text2,#dcdedf)">${fps(p.fps_low)} FPS</div><div style="font-size:12.5px;color:var(--psi-mut,#8f98a0);margin-top:4px">${tr("nízke detaily", "low settings")}</div></div>` : ""}
+      </div>` : `<div style="color:var(--psi-mut,#8f98a0);margin-bottom:8px">${tr("Odhad nie je k dispozícii – hra neuvádza porovnateľné požiadavky.", "No estimate – the game doesn't list comparable requirements.")}</div>`;
     return head
-      + row(cmp(pc.gpu_score, ref.gpu_score), "Grafika", pc.gpu || "?", ref.gpu || "")
-      + row(cmp(pc.cpu_score, ref.cpu_score), "Procesor", pc.cpu || "?", ref.cpu || "")
+      + row(cmp(pc.gpu_score, ref.gpu_score), tr("Grafika", "GPU"), pc.gpu || "?", ref.gpu || "")
+      + row(cmp(pc.cpu_score, ref.cpu_score), tr("Procesor", "CPU"), pc.cpu || "?", ref.cpu || "")
       + row(cmp(pc.ram, ref.ram), "RAM", pc.ram ? `${pc.ram} GB` : "?", ref.ram ? `${ref.ram} GB` : "")
-      + (p.notes || []).map(n => `<div style="color:#8f98a0;font-size:12px;padding-top:4px">ⓘ ${esc(n)}</div>`).join("")
-      + `<div style="color:#56707f;font-size:11px;margin-top:8px">Odhad podľa požiadaviek hry a tvojho hardvéru – skutočné FPS sa môžu líšiť.</div>`;
+      + (p.notes || []).map(n => `<div style="color:var(--psi-mut,#8f98a0);font-size:12px;padding-top:4px">${esc(n)}</div>`).join("")
+      + `<div style="color:var(--psi-faint,#56707f);font-size:11px;margin-top:8px">${tr("Hrubý odhad z požiadaviek hry a tvojho hardvéru, nie meranie.", "A rough estimate from the game's requirements and your hardware, not a benchmark.")}</div>`;
   }
 
   function linuxRows(info) {
     const p = info.protondb || {}, tier = info.native ? "native" : (p.tier || "pending");
     const rows = [];
     const tl = (TIERS[tier] || TIERS.pending).label;
-    rows.push([tier === "borked" ? "bad" : ["bronze", "silver", "pending"].includes(tier) ? "warn" : "ok", `<b style="color:#fff;font-weight:600">${tl}</b> – ${TIER_WHY[tier] || ""}`]);
+    rows.push([tier === "borked" ? "bad" : ["bronze", "silver", "pending"].includes(tier) ? "warn" : "ok", `<b style="color:var(--psi-text,#fff);font-weight:600">${tl}</b> – ${TIER_WHY()[tier] || ""}`]);
     if (!info.native && p.reports) {
-      const extra = [`${p.reports} hlásení`, CONF[p.confidence] ? `istota ${CONF[p.confidence]}` : "",
-        p.trending && p.trending !== p.tier && TIERS[p.trending] ? `nové hlásenia: ${TIERS[p.trending].label}` : "",
-        p.best && p.best !== p.tier && TIERS[p.best] ? `najlepšie: ${TIERS[p.best].label}` : ""].filter(Boolean).join(" · ");
+      const conf = CONF()[p.confidence];
+      const extra = [tr(`${p.reports} hlásení`, `${p.reports} reports`), conf ? tr(`istota ${conf}`, `confidence ${conf}`) : "",
+        p.trending && p.trending !== p.tier && TIERS[p.trending] ? tr(`nové hlásenia: ${TIERS[p.trending].label}`, `recent reports: ${TIERS[p.trending].label}`) : "",
+        p.best && p.best !== p.tier && TIERS[p.best] ? tr(`najlepšie: ${TIERS[p.best].label}`, `best: ${TIERS[p.best].label}`) : ""].filter(Boolean).join(" · ");
       rows.push(["info", `ProtonDB: ${esc(extra)}`]);
     }
     const ac = info.anticheat;
     if (ac && ac.anticheats && ac.anticheats.length) {
-      const [lvl, txt] = AC[ac.status] || ["info", `Stav: ${esc(ac.status)}`];
-      rows.push([lvl, `<b style="color:#fff;font-weight:600">${esc(ac.anticheats.join(", "))}</b> – ${txt}`]);
-      (ac.notes || []).forEach(n => rows.push(["info", `<span style="color:#8f98a0">${esc(n)}</span>`]));
+      const [lvl, txt] = AC()[ac.status] || ["info", `${tr("Stav", "Status")}: ${esc(ac.status)}`];
+      rows.push([lvl, `<b style="color:var(--psi-text,#fff);font-weight:600">${esc(ac.anticheats.join(", "))}</b> – ${txt}`]);
+      (ac.notes || []).forEach(n => rows.push(["info", `<span style="color:var(--psi-mut,#8f98a0)">${esc(n)}</span>`]));
     } else {
-      rows.push(["ok", "Bez známeho problémového anti-cheatu – online by malo ísť."]);
+      rows.push(["ok", tr("Bez známeho problémového anti-cheatu – online by malo ísť.", "No known problematic anti-cheat – online should work.")]);
     }
-    const [dl, dt] = DECK_TXT[info.deck] || DECK_TXT[0];
+    const dtx = DECK_TXT(), [dl, dt] = dtx[info.deck] || dtx[0];
     rows.push([dl, dt]);
-    rows.push([info.native ? "ok" : "info", info.native ? "Natívna Linux verzia" : "Beží cez Proton (Steam Play)"]);
+    rows.push([info.native ? "ok" : "info", info.native ? tr("Natívna Linux verzia", "Native Linux version") : tr("Beží cez Proton (Steam Play)", "Runs through Proton (Steam Play)")]);
     return rows.map(([l, h]) => `<div style="display:flex;gap:10px;align-items:flex-start;padding:5px 0;line-height:1.45"><span style="flex:none;margin-top:2px">${ICO[l]}</span><span>${h}</span></div>`).join("");
   }
   const cd = ts => { let s = Math.max(0, Math.floor(ts - Date.now() / 1000)); const d = Math.floor(s / 86400); s %= 86400;
@@ -455,7 +467,7 @@
     if (document.getElementById("psi-store")) return;
     const box = document.createElement("div");
     box.id = "psi-store";
-    box.innerHTML = `<div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game"><h1>Hrať na Linuxe</h1><div style="color:#8f98a0">Načítavam…</div></div></div>`;
+    box.innerHTML = `<div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game"><h1>${tr("Hrať na Linuxe", "Playing on Linux")}</h1><div style="color:var(--psi-mut,#8f98a0)">${tr("Načítavam…", "Loading…")}</div></div></div>`;
     anchor.parentNode.insertBefore(box, anchor);
     const feats = BOOT ? Promise.resolve(BOOT.features || {}) : window.__psiCall("features").catch(() => ({}));
     Promise.all([window.__psiCall("linux", {appid}), feats, window.__psiCall("perf", {appid}).catch(() => null)]).then(([info, feats, perf]) => {
@@ -463,39 +475,39 @@
       const t = TIERS[info.native ? "native" : (info.protondb || {}).tier] || TIERS.pending;
       box.innerHTML = `
         <div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game" style="padding-bottom:18px">
-          <h1>Hrať na Linuxe – ${esc(t.label)}</h1>
-          ${warn ? `<div style="margin:6px 0 4px;padding:10px 14px;border-radius:8px;background:rgba(217,65,38,.15);border:1px solid rgba(217,65,38,.55);color:#ffb4a3;font-size:14px">⚠ Pozor pred kúpou: ${warn.map(esc).join(" ")}</div>` : ""}
-          <div style="display:flex;gap:22px;align-items:flex-start;margin-top:8px;color:#c6d4df;font-size:14px">
+          <h1>${tr("Hrať na Linuxe", "Playing on Linux")} – ${esc(t.label)}</h1>
+          ${warn ? `<div style="margin:6px 0 4px;padding:10px 14px;border-radius:8px;background:rgba(217,65,38,.15);border:1px solid rgba(217,65,38,.55);color:#ffb4a3;font-size:14px">⚠ ${tr("Pozor pred kúpou", "Before you buy")}: ${warn.map(esc).join(" ")}</div>` : ""}
+          <div style="display:flex;gap:22px;align-items:flex-start;margin-top:8px;color:var(--psi-text2,#c6d4df);font-size:14px">
             <div style="flex:1;min-width:0">${linuxRows(info)}</div>
             ${protonCard(info)}
           </div>
         </div></div>
         <div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game" style="padding-bottom:18px">
-          <h1>Výkon na tvojom PC</h1>
-          <div style="margin-top:8px;color:#c6d4df;font-size:14px">${perfHtml(perf)}</div>
+          <h1>${tr("Výkon na tvojom PC", "Performance on your PC")}</h1>
+          <div style="margin-top:8px;color:var(--psi-text2,#c6d4df);font-size:14px">${perfHtml(perf)}</div>
         </div></div>
         <div class="game_area_purchase_game_wrapper"><div class="game_area_purchase_game psi-price" style="padding-bottom:18px">
-          <h1>Cena a zľava</h1><div style="color:#8f98a0;margin-top:6px">Načítavam ceny…</div>
+          <h1>${tr("Cena a zľava", "Price & discount")}</h1><div style="color:var(--psi-mut,#8f98a0);margin-top:6px">${tr("Načítavam ceny…", "Loading prices…")}</div>
         </div></div>`;
       const link = box.querySelector(".psi-pdb");
       link && link.addEventListener("click", () => window.open(`https://www.protondb.com/app/${appid}`, "_blank"));
       // cena môže trvať dlhšie (CheapShark) – doplní sa, keď príde
       window.__psiCall("deal", {appid}).then(d => {
-        const verdict = {buy: ["Kúp teraz", "#a4d007", "#1b2838"], wait: ["Počkaj", "#e5a83a", "#1b2838"], info: ["Info", "#8f98a0", "#1b2838"]}[d.verdict] || ["", "#8f98a0", "#1b2838"];
-        const stat = (big, small) => `<div style="min-width:110px"><div style="font-size:18px;color:#fff">${big}</div><div style="font-size:12px;color:#8f98a0">${small}</div></div>`;
+        const verdict = {buy: [tr("Kúp teraz", "Buy now"), "#a4d007", "#1b2838"], wait: [tr("Počkaj", "Wait"), "#e5a83a", "#1b2838"], info: ["Info", "#8f98a0", "#1b2838"]}[d.verdict] || ["", "#8f98a0", "#1b2838"];
+        const stat = (big, small) => `<div style="min-width:110px"><div style="font-size:18px;color:var(--psi-text,#fff)">${big}</div><div style="font-size:12px;color:var(--psi-mut,#8f98a0)">${small}</div></div>`;
         box.querySelector(".psi-price").innerHTML = `
-          <h1>Cena a zľava</h1>
+          <h1>${tr("Cena a zľava", "Price & discount")}</h1>
           <div style="display:flex;gap:26px;flex-wrap:wrap;margin:8px 0 12px">
-            ${d.on_sale ? stat(`−${d.discount} %`, d.ends ? `končí o <span data-psi-end="${d.ends}">${cd(d.ends)}</span>` : "aktuálna zľava")
-              : d.estimate ? stat(`≈ −${d.estimate} %`, "odhad najbližšej zľavy") : ""}
-            ${d.best_ever ? stat(`−${d.best_ever} %`, "historické maximum") : ""}
-            ${d.next_sale ? stat(d.next_sale.active ? "práve teraz" : `o ${Math.ceil(d.next_sale.days)} dní`, esc(d.next_sale.name)) : ""}
+            ${d.on_sale ? stat(`−${d.discount} %`, d.ends ? `${tr("končí o", "ends in")} <span data-psi-end="${d.ends}">${cd(d.ends)}</span>` : tr("aktuálna zľava", "current discount"))
+              : d.estimate ? stat(`≈ −${d.estimate} %`, tr("odhad najbližšej zľavy", "expected next discount")) : ""}
+            ${d.best_ever ? stat(`−${d.best_ever} %`, tr("historické maximum", "biggest ever")) : ""}
+            ${d.next_sale ? stat(d.next_sale.active ? tr("práve teraz", "right now") : tr(`o ${Math.ceil(d.next_sale.days)} dní`, `in ${Math.ceil(d.next_sale.days)} days`), esc(d.next_sale.name)) : ""}
           </div>
-          <div style="display:flex;gap:10px;align-items:center;color:#c6d4df;font-size:14px">
+          <div style="display:flex;gap:10px;align-items:center;color:var(--psi-text2,#c6d4df);font-size:14px">
             <span style="flex:none;background:${verdict[1]};color:${verdict[2]};font-size:12px;font-weight:700;text-transform:uppercase;padding:3px 9px;border-radius:6px">${verdict[0]}</span>
             <span>${esc(d.reason)}</span>
           </div>
-          <div style="margin-top:12px;font-size:11px;color:#56707f">Údaje: ProtonDB, AreWeAntiCheatYet, Steam, CheapShark · PSI</div>`;
+          <div style="margin-top:12px;font-size:11px;color:var(--psi-faint,#56707f)">${tr("Údaje", "Data")}: ProtonDB, AreWeAntiCheatYet, Steam, CheapShark · PSI</div>`;
       }).catch(() => { const p = box.querySelector(".psi-price"); p && p.parentElement.remove(); });
       setInterval(() => box.querySelectorAll("[data-psi-end]").forEach(el => el.textContent = cd(+el.dataset.psiEnd)), 1000);
     }).catch(() => box.remove());
