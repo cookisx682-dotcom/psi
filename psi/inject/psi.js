@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.59";
+  const VERSION = "1.60";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -712,8 +712,10 @@
   ._2T8UwmbZ9jJzntqjQU4czU{color:#fff!important;font-weight:400!important}
   ._2d9pc_ziCjBFV-KGQ-nsCh{color:#bfc6cd!important}
   /* tlačidlo Scroll to top – pilulka v farbe témy */
-  ._1J21tLst5SEhBPkVRT53UV{overflow:visible!important}
-  ._1J21tLst5SEhBPkVRT53UV > div{background:color-mix(in srgb,var(--psi-accent,#1a9fff) 78%,var(--psi-bg2,#23272e))!important;color:#fff!important;border-radius:99px!important;box-shadow:0 4px 14px rgba(0,0,0,.35)!important;font-weight:600!important;margin-bottom:6px!important;transition:filter .15s}
+  ._1J21tLst5SEhBPkVRT53UV{overflow:visible!important;padding:6px 0!important;display:flex!important;justify-content:center!important;align-items:center!important}
+  ._1J21tLst5SEhBPkVRT53UV > div{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:26px!important;padding:0 30px!important;line-height:1!important;margin:0!important;box-sizing:border-box!important;background:color-mix(in srgb,var(--psi-accent,#1a9fff) 78%,var(--psi-bg2,#23272e))!important;color:#fff!important;border-radius:99px!important;box-shadow:0 4px 14px rgba(0,0,0,.35)!important;font-weight:600!important;transition:filter .15s}
+  /* pripnutá lišta (Play/Download) pri scrollovaní dole – skryť úplne */
+  ._2Nq6ov7A1hGcHXVOXNt_OE > ._2L3s2nzh7yCnNESfI5_dN1{display:none!important}
   ._1J21tLst5SEhBPkVRT53UV > div:hover{filter:brightness(1.12)}
   .psi-libcard{border-radius:12px!important}.psi-pcard{border-radius:10px!important}
   /* jednotné farby celého okna odvodené z témy (lišta, spodok, ľavý panel, stránky knižnice) */
