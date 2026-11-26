@@ -384,7 +384,13 @@ class Psi:
     def millennium(self) -> dict:
         from . import millennium as mi
         mi.THEMES_DIR.mkdir(parents=True, exist_ok=True)
-        return {"themes": mi.list_themes(), "current": mi.current(), "dir": str(mi.THEMES_DIR)}
+        return {"themes": mi.list_themes(), "current": mi.current(), "dir": str(mi.THEMES_DIR), "options": mi.options()}
+
+    def millennium_option(self, name: str, value: str) -> dict:
+        from . import millennium as mi
+        mi.set_option(str(name), str(value))
+        self._changed()
+        return self.millennium()
 
     def millennium_set(self, theme_id: str) -> dict:
         from . import millennium as mi
@@ -449,7 +455,7 @@ class Psi:
 BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
-               "companion_qr", "features", "set_feature", "set_language", "new_pin", "theme", "set_theme", "disk", "save_library",
+               "companion_qr", "features", "set_feature", "set_language", "millennium_option", "new_pin", "theme", "set_theme", "disk", "save_library",
                "millennium", "millennium_set", "millennium_patches", "millennium_install", "millennium_open",
                "custom_css", "set_custom_css"},
     "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme", "custom_css"},
@@ -584,6 +590,10 @@ class Injector(threading.Thread):
                 result = fn(str(args.get("css", "")))
             elif method == "millennium_set":
                 result = fn(str(args.get("id", "")))
+            elif method == "millennium_option":
+                result = fn(str(args.get("name", "")), str(args.get("value", "")))
+            elif method == "set_language":
+                result = fn(str(args.get("value", "auto")))
             elif method == "millennium_install":
                 result = fn(str(args.get("url", "")))
             elif method == "save_library":

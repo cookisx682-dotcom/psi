@@ -26,7 +26,7 @@ from collections import deque
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from ..core import CONFIG, DATA_DIR, config, features
 
@@ -269,6 +269,18 @@ class Handler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin")
         return origin is None or origin in {f"http://{h}" for h in self.companion.allowed_hosts}
 
+    def _theme_asset(self, path: str):
+        """Písma a obrázky Millennium tém pre okná Steamu – len pre toto PC, len zo zložky tém."""
+        from .. import millennium as mi
+        if self.client_address[0] not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+            return self._send(404, b"Not found", "text/plain")
+        f = mi.asset_path(unquote(path[len("/mt/"):]))
+        if not f:
+            return self._send(404, b"Not found", "text/plain")
+        ctype = mi.asset_type(f)
+        return self._send(200, f.read_bytes(), ctype, cache="max-age=86400",
+                          extra={"Access-Control-Allow-Origin": "*", "Cross-Origin-Resource-Policy": "cross-origin"})
+
     # -------------------------------------------------------------- GET
     def do_HEAD(self):
         self.do_GET()
@@ -290,6 +302,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, body, ctype, cache=cache)
         if re.fullmatch(r"/(icon-192|icon-512|icon-maskable-512|apple-touch-icon)\.png", path):
             return self._send(200, icon(path[1:]), "image/png", cache="max-age=604800")
+        if path.startswith("/mt/"):
+            return self._theme_asset(path)
         if not path.startswith("/api/"):
             return self._send(404, b"Not found", "text/plain")
 

@@ -180,14 +180,14 @@ def _field(text: str, name: str) -> str:
 
 
 def requirements(appid: int) -> dict:
-    hit = CACHE.get("reqs", appid, DAY * 3)
+    hit = CACHE.get("reqs2", appid, DAY * 3)
     if hit is not None:
         return hit
     try:
         d = http_json("https://store.steampowered.com/api/appdetails", {"appids": int(appid), "l": "english"})
         data = (d.get(str(appid)) or {}).get("data") or {}
     except Exception:
-        return CACHE.stale("reqs", appid) or {}
+        return CACHE.stale("reqs2", appid) or {}
     pc = data.get("pc_requirements") if isinstance(data.get("pc_requirements"), dict) else {}
     out = {}
     for level in ("minimum", "recommended"):
@@ -195,6 +195,10 @@ def requirements(appid: int) -> dict:
         if not t:
             continue
         g, c = _field(t, "Graphics"), _field(t, "Processor")
+        # niektoré hry majú v poli „Processor“ omylom grafiku („Intel HD Graphics 5000…“) – to nie je procesor
+        if re.search(r"graphics|geforce|radeon|\bgtx\b|\brtx\b|opengl|vram|directx", c, re.I) and \
+                not re.search(r"\bcore\b|ryzen|\bi[3579]\b|\bi[3579]-|pentium|celeron|athlon|phenom|\bfx\b|xeon|ghz|cpu|processor|quad|dual", c, re.I):
+            c = ""
         gm = gpu_models(g)
         score = round(sum(s for _, s in gm) / len(gm)) if gm else None
         if score is None:
@@ -208,7 +212,7 @@ def requirements(appid: int) -> dict:
         out[level] = {"gpu": g[:140], "gpu_models": [m[0] for m in gm], "gpu_score": score,
                       "cpu": c[:140], "cpu_score": cpu_score(c), "ram": ram_gb(_field(t, "Memory") + " ram"),
                       "dx": (re.search(r"(\d+)", _field(t, "DirectX")) or [None, None])[1]}
-    CACHE.put("reqs", appid, out)
+    CACHE.put("reqs2", appid, out)
     return out
 
 

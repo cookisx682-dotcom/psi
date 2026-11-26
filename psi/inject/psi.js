@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.63";
+  const VERSION = "1.64";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -326,6 +326,12 @@
           <button type="button" class="DialogButton _DialogLayout Secondary Focusable" id="psi-mill-open" style="width:auto;padding:0 16px">${tr("Otvoriť priečinok", "Open folder")}</button>
           <button type="button" class="DialogButton _DialogLayout Secondary Focusable" id="psi-mill-web" style="width:auto;padding:0 16px">${tr("Prehliadať témy", "Browse themes")}</button>
         </div>
+        ${mill.current && mill.options && Object.keys(mill.options).length ? `<div class="psi-h" style="margin-top:14px">${tr("Voľby témy", "Theme options")}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px 16px">
+          ${Object.entries(mill.options).map(([k, o]) => `<label title="${esc(o.description)}" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--psi-mut,#8f98a0)">${esc(k)}
+            <select data-mopt="${esc(k)}" style="height:30px;padding:0 8px;background:var(--psi-ctl,#32353c);color:var(--psi-text,#fff);border:0;border-radius:8px;font-size:13px">
+            ${o.values.map(v => `<option value="${esc(v)}" ${v === o.value ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>`).join("")}
+          </div>` : ""}
         <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
           <input id="psi-mill-url" type="text" placeholder="https://github.com/${tr("autor/tema", "author/theme")}" style="flex:1;height:34px;border:0;border-radius:8px;background:#32353c;color:var(--psi-text,#fff);padding:0 10px;font-size:14px">
           <button type="button" class="DialogButton _DialogLayout Primary Focusable" id="psi-mill-inst" style="width:auto;padding:0 16px">${tr("Inštalovať", "Install")}</button>
@@ -381,9 +387,13 @@
     /* ---- Millennium ---- */
     const mmsg = body.querySelector("#psi-mill-msg");
     body.querySelector("#psi-mill-sel").addEventListener("change", async ev => {
-      try { await call("millennium_set", {id: ev.target.value}); await refreshMillennium(); scan(); mmsg.textContent = ev.target.value ? tr("Téma použitá.", "Theme applied.") : tr("Millennium téma vypnutá.", "Millennium theme turned off."); }
+      try { await call("millennium_set", {id: ev.target.value}); await refreshMillennium(); scan(); render(doc); }
       catch (e) { mmsg.textContent = tr("Chyba: ", "Error: ") + e.message; }
     });
+    body.querySelectorAll("[data-mopt]").forEach(sel => sel.addEventListener("change", async () => {
+      try { await call("millennium_option", {name: sel.dataset.mopt, value: sel.value}); await refreshMillennium(); scan(); mmsg.textContent = tr("Voľba uložená.", "Option saved."); }
+      catch (e) { mmsg.textContent = tr("Chyba: ", "Error: ") + e.message; }
+    }));
     body.querySelector("#psi-mill-open").addEventListener("click", () => call("millennium_open").catch(() => {}));
     body.querySelector("#psi-mill-web").addEventListener("click", () => openUrl("https://steambrew.app/themes"));
     body.querySelector("#psi-mill-inst").addEventListener("click", async () => {
@@ -1207,7 +1217,9 @@
   let MILL = [];
   async function refreshMillennium() { try { MILL = await call("millennium_patches"); } catch (e) { MILL = []; } }
   function applyMillennium(doc, title) {
-    const css = MILL.filter(p => { try { return new RegExp(p.re).test(title || ""); } catch (e) { return false; } }).map(p => p.css).join("\n");
+    // Millennium vyberá okno podľa názvu, alebo podľa triedy (vzor začína bodkou, napr. „.ModalDialogPopup“)
+    const byClass = rx => { try { return /^\.[\w-]+$/.test(rx) && !!doc.querySelector(`html${rx}, body${rx}, body > ${rx}, body > * > ${rx}`); } catch (e) { return false; } };
+    const css = MILL.filter(p => { try { return new RegExp(p.re).test(title || "") || byClass(p.re); } catch (e) { return byClass(p.re); } }).map(p => p.css).join("\n");
     let st = doc.getElementById("psi-millennium");
     if (!css) { st && st.remove(); return; }
     if (!st) { st = doc.createElement("style"); st.id = "psi-millennium"; (doc.head || doc.documentElement).appendChild(st); }
