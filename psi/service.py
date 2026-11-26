@@ -390,6 +390,45 @@ class Psi:
         mi.THEMES_DIR.mkdir(parents=True, exist_ok=True)
         return {"themes": mi.list_themes(), "current": mi.current(), "dir": str(mi.THEMES_DIR), "options": mi.options()}
 
+    # ------------------------------------------------------------------ nevypínať PC počas sťahovania
+    _inhibit: "subprocess.Popen | None" = None
+    _inhibit_beat = 0.0
+    _inhibit_lock = threading.Lock()
+
+    def keep_awake(self, on: bool, name: str = "") -> dict:
+        """Kým Steam sťahuje, drží systemd-inhibit (sleep) – PC sa neuspí, obrazovka sa vypnúť môže.
+        Steam to obnovuje každých ~20 s; bez obnovy 2 min (Steam zavretý) sa zámok sám uvoľní."""
+        on = bool(on) and core.features().get("keep_awake_download", True) and bool(shutil.which("systemd-inhibit"))
+        with self._inhibit_lock:
+            p = self._inhibit
+            if on:
+                Psi._inhibit_beat = time.time()
+                if not p or p.poll() is not None:
+                    why = core.tr(f"Steam sťahuje {name}".strip(), f"Steam is downloading {name}".strip())[:120]
+                    Psi._inhibit = subprocess.Popen(["systemd-inhibit", "--what=sleep", "--who=PSI", f"--why={why}",
+                                                     "--mode=block", "sleep", "infinity"],
+                                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    log.info("Sleep blocked while Steam downloads %s", name)
+                    threading.Thread(target=self._inhibit_watch, daemon=True, name="psi-inhibit").start()
+            elif p and p.poll() is None:
+                p.terminate()
+                Psi._inhibit = None
+                log.info("Sleep allowed again (download finished)")
+        return {"active": bool(self._inhibit and self._inhibit.poll() is None)}
+
+    def _inhibit_watch(self) -> None:
+        while True:
+            time.sleep(30)
+            with self._inhibit_lock:
+                p = self._inhibit
+                if not p or p.poll() is not None:
+                    return
+                if time.time() - self._inhibit_beat > 120:
+                    p.terminate()
+                    Psi._inhibit = None
+                    log.info("Sleep allowed again (no word from Steam)")
+                    return
+
     def millennium_option(self, name: str, value: str) -> dict:
         from . import millennium as mi
         mi.set_option(str(name), str(value))
@@ -459,7 +498,7 @@ class Psi:
 BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
-               "companion_qr", "features", "set_feature", "set_language", "millennium_option", "new_pin", "theme", "set_theme", "disk", "save_library",
+               "companion_qr", "features", "set_feature", "set_language", "millennium_option", "keep_awake", "new_pin", "theme", "set_theme", "disk", "save_library",
                "millennium", "millennium_set", "millennium_patches", "millennium_install", "millennium_open",
                "custom_css", "set_custom_css"},
     "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme", "custom_css"},
@@ -596,6 +635,8 @@ class Injector(threading.Thread):
                 result = fn(str(args.get("id", "")))
             elif method == "millennium_option":
                 result = fn(str(args.get("name", "")), str(args.get("value", "")))
+            elif method == "keep_awake":
+                result = fn(bool(args.get("on")), str(args.get("name", ""))[:80])
             elif method == "set_language":
                 result = fn(str(args.get("value", "auto")))
             elif method == "millennium_install":

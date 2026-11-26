@@ -24,6 +24,8 @@ The downloads page shows how much is left, the time remaining and the free disk 
 While music plays (Spotify or any MPRIS player), soft waves in your theme colour move to the beat
 along the bottom of Steam. PSI reads the sound only while music plays and the Steam window is visible;
 nothing is recorded.
+While Steam downloads or installs, PSI keeps the PC from going to sleep (the screen can still turn off),
+so big downloads finish overnight.
 Running games also get their real icon in the dock and taskbar instead of a blank one (PSI writes
 hidden `.desktop` entries with `StartupWMClass=steam_app_<appid>` for every installed game).
 

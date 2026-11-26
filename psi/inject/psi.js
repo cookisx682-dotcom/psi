@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.71";
+  const VERSION = "1.72";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -148,6 +148,7 @@
     ["library", tr("ProtonDB v knižnici", "ProtonDB in the library"), tr("Pri každej hre v knižnici: medaila ProtonDB (Platinum, Gold…) alebo „Natívne“, ak má hra Linux verziu.", "Next to every game: its ProtonDB medal (Platinum, Gold…) or “Native” if it has a Linux build.")],
     ["store", tr("ProtonDB a zľavy v obchode", "ProtonDB and prices in the store"), tr("Na stránke hry: medaila, odpočet konca zľavy, odhad zľavy a odporúčanie kúp/počkaj.", "On game pages: the medal, sale countdown, expected discount and a buy / wait hint.")],
     ["community", tr("Vitrína „Môj týždeň“", "“My week” showcase"), tr("Na tvojom Steam profile: hodiny, hra týždňa a odznaky. Vidíš ju len ty.", "On your Steam profile: hours played, game of the week and badges. Only you can see it.")],
+    ["keep_awake_download", tr("Neuspať PC počas sťahovania", "Stay awake while downloading"), tr("Kým Steam sťahuje alebo inštaluje, počítač sa neuspí (obrazovka sa vypnúť môže). Po dokončení sa uspávanie vráti.", "While Steam downloads or installs, the PC won't go to sleep (the screen can still turn off). Sleep works again once it finishes.")],
     ["music_waves", tr("Vlnky pri hudbe", "Music waves"), tr("Keď hrá hudba (Spotify a pod.), v spodnej časti Steamu sa vlnia vlnky vo farbe témy podľa rytmu.", "While music plays (Spotify etc.), waves in your theme colour move to the beat along the bottom of Steam.")],
     ["dock_icons", tr("Ikony hier v doku", "Game icons in the dock"), tr("Spustená hra má v doku a paneli úloh svoju ikonu namiesto prázdnej. Pre všetky nainštalované hry, v menu aplikácií sa neukážu.", "A running game shows its own icon in the dock and taskbar instead of a blank one. For every installed game; they don't appear in the app menu.")],
     ["companion_lan", tr("Companion pre mobil", "Companion for your phone"), tr("Prístup z telefónu v domácej Wi-Fi. Na tomto PC beží Companion vždy.", "Access from your phone on home Wi-Fi. On this PC the Companion always runs.")],
@@ -1245,6 +1246,20 @@
     Object.assign(WAVE, {es, doc, canvas: c});
   }
 
+  /* ---------------- PC sa neuspí, kým Steam sťahuje ---------------- */
+  let awakeOn = false;
+  function downloadKeepAwake() {
+    const ov = window.downloadsStore && downloadsStore.m_DownloadOverview;
+    const list = !ov ? [] : typeof ov.values === "function" ? [...ov.values()] : Array.isArray(ov) ? ov.map(x => Array.isArray(x) ? x[1] : x) : Object.values(ov);
+    const act = list.find(o => o && o.update_appid && !o.paused && o.update_state && o.update_state !== "None");
+    const on = !!act && FEAT.keep_awake_download !== false;
+    if (!on && !awakeOn) return;                          // nič sa nedeje – netreba volať službu
+    let name = "";
+    try { name = act ? ((appStore.GetAppOverviewByAppID(act.update_appid) || {}).display_name || "") : ""; } catch (e) {}
+    awakeOn = on;
+    call("keep_awake", {on, name}).catch(() => {});
+  }
+
   async function windowWatchdog() {
     const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
     const w = pop && pop.m_popup;
@@ -1340,6 +1355,8 @@
   const extraTimer = setInterval(() => { try { libraryExtras(); } catch (e) {} try { downloadsExtras(); } catch (e) {} }, 800);
   const wdTimer = setInterval(() => { windowWatchdog().catch(() => {}); }, 2000);
   const waveTimer = setInterval(() => { musicWaves().catch(e => { window.__psiWaveErr = String(e && e.stack || e); }); }, 1000);
+  const awakeTimer = setInterval(() => { try { downloadKeepAwake(); } catch (e) {} }, 20000);
+  setTimeout(() => { try { downloadKeepAwake(); } catch (e) {} }, 3000);
   window.__psiWave = WAVE;
   window.__psiCleanup = () => {
     active = false;
@@ -1352,6 +1369,7 @@
     clearInterval(extraTimer);
     clearInterval(wdTimer);
     clearInterval(waveTimer); wavesStop();
+    clearInterval(awakeTimer);
     for (const p of (window.g_PopupManager && g_PopupManager.m_mapPopups ? g_PopupManager.m_mapPopups.values() : [])) {
       const doc = p.m_popup && p.m_popup.document;
       if (!doc) continue;

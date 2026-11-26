@@ -118,6 +118,7 @@ DEFAULT_FEATURES = {
     "companion_lan": True,  # Companion dostupný z mobilu v domácej sieti
     "dock_icons": True,     # ikony hier v doku / paneli úloh (skryté .desktop záznamy)
     "music_waves": True,    # vlnky v pozadí Steamu, keď hrá hudba
+    "keep_awake_download": True,  # PC sa neuspí, kým Steam sťahuje
 }
 
 
