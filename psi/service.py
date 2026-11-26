@@ -390,13 +390,6 @@ class Psi:
         mi.THEMES_DIR.mkdir(parents=True, exist_ok=True)
         return {"themes": mi.list_themes(), "current": mi.current(), "dir": str(mi.THEMES_DIR), "options": mi.options()}
 
-    def wallpaper(self) -> list:
-        """Monitory a ich tapety pre priehľadné okno Steamu."""
-        from . import wallpaper as wp
-        port = int((config().get("companion") or {}).get("port") or 8787)
-        return [{k: s[k] for k in ("x", "y", "w", "h", "kind")} | {"url": f"http://127.0.0.1:{port}/wp/{i}?v={s['mtime']}"}
-                for i, s in enumerate(wp.screens())]
-
     def millennium_option(self, name: str, value: str) -> dict:
         from . import millennium as mi
         mi.set_option(str(name), str(value))
@@ -466,7 +459,7 @@ class Psi:
 BRIDGE_METHODS = {
     "shared": {"week", "wishlist", "deal", "protondb", "game", "linux", "tiers", "perf", "search", "companion_info", "me",
                "fonts", "font_css", "set_font", "upload_font",
-               "companion_qr", "features", "set_feature", "set_language", "millennium_option", "wallpaper", "new_pin", "theme", "set_theme", "disk", "save_library",
+               "companion_qr", "features", "set_feature", "set_language", "millennium_option", "new_pin", "theme", "set_theme", "disk", "save_library",
                "millennium", "millennium_set", "millennium_patches", "millennium_install", "millennium_open",
                "custom_css", "set_custom_css"},
     "web": {"deal", "protondb", "game", "linux", "tiers", "perf", "week", "me", "features", "font_css", "theme", "custom_css"},

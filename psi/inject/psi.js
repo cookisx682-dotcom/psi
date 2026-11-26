@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.67";
+  const VERSION = "1.71";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -148,7 +148,7 @@
     ["library", tr("ProtonDB v knižnici", "ProtonDB in the library"), tr("Pri každej hre v knižnici: medaila ProtonDB (Platinum, Gold…) alebo „Natívne“, ak má hra Linux verziu.", "Next to every game: its ProtonDB medal (Platinum, Gold…) or “Native” if it has a Linux build.")],
     ["store", tr("ProtonDB a zľavy v obchode", "ProtonDB and prices in the store"), tr("Na stránke hry: medaila, odpočet konca zľavy, odhad zľavy a odporúčanie kúp/počkaj.", "On game pages: the medal, sale countdown, expected discount and a buy / wait hint.")],
     ["community", tr("Vitrína „Môj týždeň“", "“My week” showcase"), tr("Na tvojom Steam profile: hodiny, hra týždňa a odznaky. Vidíš ju len ty.", "On your Steam profile: hours played, game of the week and badges. Only you can see it.")],
-    ["glass_window", tr("Priehľadné okno", "See-through window"), tr("Za oknom Steamu presvitá tapeta plochy (aj video) – ako sklo. Panely sú polopriehľadné.", "Your desktop wallpaper (video too) shows through the Steam window like glass. Panels become translucent.")],
+    ["music_waves", tr("Vlnky pri hudbe", "Music waves"), tr("Keď hrá hudba (Spotify a pod.), v spodnej časti Steamu sa vlnia vlnky vo farbe témy podľa rytmu.", "While music plays (Spotify etc.), waves in your theme colour move to the beat along the bottom of Steam.")],
     ["dock_icons", tr("Ikony hier v doku", "Game icons in the dock"), tr("Spustená hra má v doku a paneli úloh svoju ikonu namiesto prázdnej. Pre všetky nainštalované hry, v menu aplikácií sa neukážu.", "A running game shows its own icon in the dock and taskbar instead of a blank one. For every installed game; they don't appear in the app menu.")],
     ["companion_lan", tr("Companion pre mobil", "Companion for your phone"), tr("Prístup z telefónu v domácej Wi-Fi. Na tomto PC beží Companion vždy.", "Access from your phone on home Wi-Fi. On this PC the Companion always runs.")],
   ];
@@ -478,7 +478,6 @@
       sw.classList.toggle("on", on);
       try { await call("set_feature", {name: sw.dataset.f, value: on}); } catch (e) { sw.classList.toggle("on", !on); }
       if (sw.dataset.f === "collections") { await refreshFeatures(); on ? syncCollections(true) : removeCollections(); }
-      if (sw.dataset.f === "glass_window") { await refreshFeatures(); glassWindow().catch(() => {}); }
       if (sw.dataset.f === "companion_lan") setTimeout(() => render(doc), 800);
     }));
   }
@@ -1179,56 +1178,71 @@
       window.__psiScrollOff = () => { try { w.document.removeEventListener("scroll", onScroll, true); } catch (e) {} };
     }
   }
-  /* ---------------- priehľadné okno: tapeta plochy za Steamom ----------------
-     Steam nevie byť naozaj priehľadný, tak za obsah okna vložíme tapetu (obrázok alebo video)
-     presne v mieste, kde okno na monitore leží, a panely spravíme polopriehľadné. */
-  const GLASS_CSS = `
-  html.psi-glasswin,html.psi-glasswin body{background:transparent!important}
-  #psi-wall{position:fixed;z-index:-1;pointer-events:none;overflow:hidden;contain:strict}
-  #psi-wall .psi-wall-media{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.48)}
-  html.psi-glasswin{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 42%,transparent)!important;
-    --psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 55%,transparent)!important}
-  html.psi-glasswin ._1ENHEsrSLcTRtPQFl1F-wL,html.psi-glasswin ._1bq4x9pa4-9RLY-dXWUZTp,
-  html.psi-glasswin ._2Dd4T78PcCTUVgOtDGFY5j{background:transparent!important}`;
-  let WALL = null, wallT = 0, wallBusy = false;
-  async function glassWindow() {
+  /* ---------------- vlnky v pozadí, keď hrá hudba ----------------
+     Úrovne hudby posiela služba PSI (Server-Sent Events z 127.0.0.1). Keď nič nehrá alebo je okno
+     skryté, spojenie sa zavrie a služba prestane zvuk čítať. */
+  const WAVE = {es: null, doc: null, canvas: null, lvl: null, cur: [], alpha: 0, raf: 0, url: ""};
+  function wavesStop() {
+    try { WAVE.es && WAVE.es.close(); } catch (e) {}
+    try { WAVE.raf && WAVE.doc && WAVE.doc.defaultView.cancelAnimationFrame(WAVE.raf); } catch (e) {}
+    WAVE.canvas && WAVE.canvas.remove();
+    Object.assign(WAVE, {es: null, doc: null, canvas: null, lvl: null, cur: [], alpha: 0, raf: 0});
+  }
+  function wavesDraw(ts) {
+    WAVE.raf = 0;
+    const c = WAVE.canvas, w = c && c.ownerDocument.defaultView;
+    if (!c || !w) return;
+    const dpr = w.devicePixelRatio || 1, W = Math.round(w.innerWidth * dpr), H = Math.round(c.clientHeight * dpr);
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    const ctx = c.getContext("2d");
+    const lvl = WAVE.lvl, n = (lvl && lvl.length) || WAVE.cur.length || 24;
+    while (WAVE.cur.length < n) WAVE.cur.push(0);
+    for (let i = 0; i < n; i++) WAVE.cur[i] += (((lvl && lvl[i]) || 0) - WAVE.cur[i]) * 0.22;
+    WAVE.alpha += ((lvl ? 1 : 0) - WAVE.alpha) * 0.05;
+    ctx.clearRect(0, 0, W, H);
+    if (WAVE.alpha < 0.01 && !lvl) return;                     // ticho – kreslenie stojí, kým nepríde hudba
+    const acc = THEME.accent || "#1a9fff", t = ts / 1000, M = 64;
+    const at = x => { const p = x * (n - 1), i = Math.floor(p), f = p - i; return (WAVE.cur[i] || 0) * (1 - f) + (WAVE.cur[i + 1] || 0) * f; };
+    const layers = [[0.34, 0.0, 0.9], [0.24, 1.7, 0.7], [0.16, 3.1, 0.5]];
+    for (const [alpha, ph, amp] of layers) {
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      let px = 0, py = H;
+      for (let j = 0; j <= M; j++) {
+        const x = j / M, v = at(x);
+        const swell = 0.55 + 0.45 * Math.sin(t * 1.3 + x * 7 + ph);
+        const y = H - H * (0.06 + amp * 0.86 * v * swell) ;
+        const X = x * W;
+        if (j === 0) { ctx.lineTo(X, y); } else { ctx.quadraticCurveTo(px, py, (px + X) / 2, (py + y) / 2); }
+        px = X; py = y;
+      }
+      ctx.lineTo(W, py); ctx.lineTo(W, H); ctx.closePath();
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      const hex = a => Math.round(Math.min(1, a) * 255).toString(16).padStart(2, "0");
+      g.addColorStop(0, acc + "00"); g.addColorStop(0.5, acc + hex(alpha * WAVE.alpha * 0.7)); g.addColorStop(1, acc + hex(alpha * WAVE.alpha));
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
+    WAVE.raf = w.requestAnimationFrame(wavesDraw);
+  }
+  async function musicWaves() {
     const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
     const w = pop && pop.m_popup, doc = w && w.document;
-    if (!doc || !doc.body || wallBusy) return;
-    let layer = doc.getElementById("psi-wall");
-    if (!FEAT.glass_window) {
-      if (layer) layer.remove();
-      doc.documentElement.classList.remove("psi-glasswin");
-      const st = doc.getElementById("psi-glasswin-css"); st && st.remove();
-      return;
-    }
-    if (!WALL || Date.now() - wallT > 60000) {
-      wallBusy = true;
-      try { WALL = await call("wallpaper"); wallT = Date.now(); } catch (e) { WALL = WALL || []; }
-      finally { wallBusy = false; }
-    }
-    const cx = w.screenX + w.outerWidth / 2, cy = w.screenY + w.outerHeight / 2;
-    const scr = WALL.find(m => cx >= m.x && cx < m.x + m.w && cy >= m.y && cy < m.y + m.h) || WALL[0];
-    if (!scr) return;
-    if (!doc.getElementById("psi-glasswin-css")) {
-      const st = doc.createElement("style"); st.id = "psi-glasswin-css"; st.textContent = GLASS_CSS; (doc.head || doc.documentElement).appendChild(st);
-    }
-    doc.documentElement.classList.add("psi-glasswin");
-    if (!layer || layer.dataset.url !== scr.url) {
-      layer && layer.remove();
-      layer = doc.createElement("div");
-      layer.id = "psi-wall"; layer.dataset.url = scr.url;
-      const m = doc.createElement(scr.kind === "video" ? "video" : "img");
-      m.className = "psi-wall-media";
-      if (scr.kind === "video") { m.muted = true; m.loop = true; m.autoplay = true; m.playsInline = true; m.setAttribute("muted", ""); }
-      m.src = scr.url;
-      layer.appendChild(m);
-      doc.body.prepend(layer);
-    }
-    const css = `left:${scr.x - w.screenX}px;top:${scr.y - w.screenY}px;width:${scr.w}px;height:${scr.h}px`;
-    if (layer.style.cssText !== css) layer.style.cssText = css;
-    const v = layer.querySelector("video");
-    if (v) { if (doc.hidden) { if (!v.paused) v.pause(); } else if (v.paused) v.play().catch(() => {}); }   // skryté okno = video stojí
+    if (!doc || !doc.body || FEAT.music_waves === false || doc.hidden) { if (WAVE.es) wavesStop(); return; }
+    if (WAVE.doc && WAVE.doc !== doc) wavesStop();
+    if (WAVE.es) return;
+    if (!WAVE.url) { try { WAVE.url = (await call("companion_info")).local_url || ""; } catch (e) { return; } }
+    if (!WAVE.url) return;
+    const c = doc.createElement("canvas");
+    c.id = "psi-waves";
+    c.style.cssText = "position:fixed;left:0;right:0;bottom:0;width:100%;height:30vh;pointer-events:none;z-index:1;mix-blend-mode:screen";
+    doc.body.appendChild(c);
+    const es = new w.EventSource(WAVE.url.replace(/\/$/, "") + "/viz");
+    es.onmessage = e => {
+      try { WAVE.lvl = JSON.parse(e.data); } catch (err) { WAVE.lvl = null; }
+      if ((WAVE.lvl || WAVE.alpha > 0.01) && !WAVE.raf) WAVE.raf = w.requestAnimationFrame(wavesDraw);
+    };
+    Object.assign(WAVE, {es, doc, canvas: c});
   }
 
   async function windowWatchdog() {
@@ -1325,7 +1339,8 @@
   const libTimer = setInterval(libraryTick, 500);
   const extraTimer = setInterval(() => { try { libraryExtras(); } catch (e) {} try { downloadsExtras(); } catch (e) {} }, 800);
   const wdTimer = setInterval(() => { windowWatchdog().catch(() => {}); }, 2000);
-  const glassTimer = setInterval(() => { glassWindow().catch(() => {}); }, 600);
+  const waveTimer = setInterval(() => { musicWaves().catch(e => { window.__psiWaveErr = String(e && e.stack || e); }); }, 1000);
+  window.__psiWave = WAVE;
   window.__psiCleanup = () => {
     active = false;
     try { window.__psiScrollOff && window.__psiScrollOff(); } catch (e) {}
@@ -1336,7 +1351,7 @@
     clearInterval(libTimer);
     clearInterval(extraTimer);
     clearInterval(wdTimer);
-    clearInterval(glassTimer);
+    clearInterval(waveTimer); wavesStop();
     for (const p of (window.g_PopupManager && g_PopupManager.m_mapPopups ? g_PopupManager.m_mapPopups.values() : [])) {
       const doc = p.m_popup && p.m_popup.document;
       if (!doc) continue;

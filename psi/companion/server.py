@@ -281,37 +281,30 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(200, f.read_bytes(), ctype, cache="max-age=86400",
                           extra={"Access-Control-Allow-Origin": "*", "Cross-Origin-Resource-Policy": "cross-origin"})
 
-    def _wallpaper(self, index: int):
-        """Tapeta plochy pre priehľadné okno Steamu – len pre toto PC; video s podporou Range."""
-        from .. import wallpaper as wp
-        if self.client_address[0] not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+    def _viz(self):
+        """Server-Sent Events s úrovňami hudby pre vlnky v Steame – len pre toto PC."""
+        from .. import audio
+        if self.client_address[0] not in ("127.0.0.1", "::1", "::ffff:127.0.0.1") or not features().get("music_waves", True):
             return self._send(404, b"Not found", "text/plain")
-        f = wp.file_for(index)
-        if not f or not f.is_file():
-            return self._send(404, b"Not found", "text/plain")
-        ext = f.suffix.lower()
-        ctype = {".mp4": "video/mp4", ".m4v": "video/mp4", ".webm": "video/webm", ".mkv": "video/x-matroska", ".mov": "video/quicktime",
-                 ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".avif": "image/avif",
-                 ".gif": "image/gif", ".svg": "image/svg+xml", ".bmp": "image/bmp", ".jxl": "image/jxl"}.get(ext, "application/octet-stream")
-        size = f.stat().st_size
-        start, end = 0, size - 1
-        m = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range", "").strip())
-        partial = bool(m and (m[1] or m[2]))
-        if partial:
-            if m[1]:
-                start = int(m[1]); end = min(int(m[2]) if m[2] else size - 1, size - 1)
-            else:
-                start = max(0, size - int(m[2]))
-            end = min(end, start + 8 * 1024 * 1024 - 1)       # po kúskoch, nech sa nečíta celé video naraz
-            if start >= size:
-                return self._send(416, b"", "text/plain", extra={"Content-Range": f"bytes */{size}"})
-        with f.open("rb") as fh:
-            fh.seek(start)
-            body = fh.read(end - start + 1)
-        extra = {"Accept-Ranges": "bytes", "Access-Control-Allow-Origin": "*", "Cross-Origin-Resource-Policy": "cross-origin"}
-        if partial:
-            extra["Content-Range"] = f"bytes {start}-{start + len(body) - 1}/{size}"
-        return self._send(206 if partial else 200, body, ctype, extra=extra, cache="max-age=3600")
+        self.close_connection = True
+        self.send_response(200)
+        for k, v in (("Content-Type", "text/event-stream"), ("Cache-Control", "no-store"),
+                     ("Access-Control-Allow-Origin", "*"), ("Connection", "close")):
+            self.send_header(k, v)
+        self.end_headers()
+        w = audio.waves()
+        w.attach()
+        try:
+            seq, idle = -1, 0.0
+            while features().get("music_waves", True):
+                seq, frame = w.wait(seq, timeout=10)
+                data = json.dumps(frame, separators=(",", ":")) if frame is not None else "null"
+                self.wfile.write(f"data: {data}\n\n".encode())
+                self.wfile.flush()
+        except (OSError, ValueError):
+            pass
+        finally:
+            w.detach()
 
     # -------------------------------------------------------------- GET
     def do_HEAD(self):
@@ -336,8 +329,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, icon(path[1:]), "image/png", cache="max-age=604800")
         if path.startswith("/mt/"):
             return self._theme_asset(path)
-        if re.fullmatch(r"/wp/\d+", path):
-            return self._wallpaper(int(path[4:]))
+        if path == "/viz":
+            return self._viz()
         if not path.startswith("/api/"):
             return self._send(404, b"Not found", "text/plain")
 

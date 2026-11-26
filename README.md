@@ -21,8 +21,9 @@ Wishlist items get small rating badges, and KDE notifies you when one of them go
 For the look, there are rounded corners, a theme editor (accent colour, panel colour, blur, corner
 radius), custom fonts, your own CSS, and Millennium themes (CSS only, their JavaScript never runs).
 The downloads page shows how much is left, the time remaining and the free disk space.
-With *See-through window* on, your desktop wallpaper (KDE image or video wallpaper) shows through the
-Steam window like glass – PSI draws it behind Steam at the exact spot the window covers.
+While music plays (Spotify or any MPRIS player), soft waves in your theme colour move to the beat
+along the bottom of Steam. PSI reads the sound only while music plays and the Steam window is visible;
+nothing is recorded.
 Running games also get their real icon in the dock and taskbar instead of a blank one (PSI writes
 hidden `.desktop` entries with `StartupWMClass=steam_app_<appid>` for every installed game).
 
