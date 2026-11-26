@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.65";
+  const VERSION = "1.67";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -148,6 +148,7 @@
     ["library", tr("ProtonDB v knižnici", "ProtonDB in the library"), tr("Pri každej hre v knižnici: medaila ProtonDB (Platinum, Gold…) alebo „Natívne“, ak má hra Linux verziu.", "Next to every game: its ProtonDB medal (Platinum, Gold…) or “Native” if it has a Linux build.")],
     ["store", tr("ProtonDB a zľavy v obchode", "ProtonDB and prices in the store"), tr("Na stránke hry: medaila, odpočet konca zľavy, odhad zľavy a odporúčanie kúp/počkaj.", "On game pages: the medal, sale countdown, expected discount and a buy / wait hint.")],
     ["community", tr("Vitrína „Môj týždeň“", "“My week” showcase"), tr("Na tvojom Steam profile: hodiny, hra týždňa a odznaky. Vidíš ju len ty.", "On your Steam profile: hours played, game of the week and badges. Only you can see it.")],
+    ["glass_window", tr("Priehľadné okno", "See-through window"), tr("Za oknom Steamu presvitá tapeta plochy (aj video) – ako sklo. Panely sú polopriehľadné.", "Your desktop wallpaper (video too) shows through the Steam window like glass. Panels become translucent.")],
     ["dock_icons", tr("Ikony hier v doku", "Game icons in the dock"), tr("Spustená hra má v doku a paneli úloh svoju ikonu namiesto prázdnej. Pre všetky nainštalované hry, v menu aplikácií sa neukážu.", "A running game shows its own icon in the dock and taskbar instead of a blank one. For every installed game; they don't appear in the app menu.")],
     ["companion_lan", tr("Companion pre mobil", "Companion for your phone"), tr("Prístup z telefónu v domácej Wi-Fi. Na tomto PC beží Companion vždy.", "Access from your phone on home Wi-Fi. On this PC the Companion always runs.")],
   ];
@@ -477,6 +478,7 @@
       sw.classList.toggle("on", on);
       try { await call("set_feature", {name: sw.dataset.f, value: on}); } catch (e) { sw.classList.toggle("on", !on); }
       if (sw.dataset.f === "collections") { await refreshFeatures(); on ? syncCollections(true) : removeCollections(); }
+      if (sw.dataset.f === "glass_window") { await refreshFeatures(); glassWindow().catch(() => {}); }
       if (sw.dataset.f === "companion_lan") setTimeout(() => render(doc), 800);
     }));
   }
@@ -1177,6 +1179,58 @@
       window.__psiScrollOff = () => { try { w.document.removeEventListener("scroll", onScroll, true); } catch (e) {} };
     }
   }
+  /* ---------------- priehľadné okno: tapeta plochy za Steamom ----------------
+     Steam nevie byť naozaj priehľadný, tak za obsah okna vložíme tapetu (obrázok alebo video)
+     presne v mieste, kde okno na monitore leží, a panely spravíme polopriehľadné. */
+  const GLASS_CSS = `
+  html.psi-glasswin,html.psi-glasswin body{background:transparent!important}
+  #psi-wall{position:fixed;z-index:-1;pointer-events:none;overflow:hidden;contain:strict}
+  #psi-wall .psi-wall-media{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.48)}
+  html.psi-glasswin{--psi-bg:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 42%,transparent)!important;
+    --psi-bg2:color-mix(in srgb,var(--psi-panel-solid,#121c2c) 55%,transparent)!important}
+  html.psi-glasswin ._1ENHEsrSLcTRtPQFl1F-wL,html.psi-glasswin ._1bq4x9pa4-9RLY-dXWUZTp,
+  html.psi-glasswin ._2Dd4T78PcCTUVgOtDGFY5j{background:transparent!important}`;
+  let WALL = null, wallT = 0, wallBusy = false;
+  async function glassWindow() {
+    const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
+    const w = pop && pop.m_popup, doc = w && w.document;
+    if (!doc || !doc.body || wallBusy) return;
+    let layer = doc.getElementById("psi-wall");
+    if (!FEAT.glass_window) {
+      if (layer) layer.remove();
+      doc.documentElement.classList.remove("psi-glasswin");
+      const st = doc.getElementById("psi-glasswin-css"); st && st.remove();
+      return;
+    }
+    if (!WALL || Date.now() - wallT > 60000) {
+      wallBusy = true;
+      try { WALL = await call("wallpaper"); wallT = Date.now(); } catch (e) { WALL = WALL || []; }
+      finally { wallBusy = false; }
+    }
+    const cx = w.screenX + w.outerWidth / 2, cy = w.screenY + w.outerHeight / 2;
+    const scr = WALL.find(m => cx >= m.x && cx < m.x + m.w && cy >= m.y && cy < m.y + m.h) || WALL[0];
+    if (!scr) return;
+    if (!doc.getElementById("psi-glasswin-css")) {
+      const st = doc.createElement("style"); st.id = "psi-glasswin-css"; st.textContent = GLASS_CSS; (doc.head || doc.documentElement).appendChild(st);
+    }
+    doc.documentElement.classList.add("psi-glasswin");
+    if (!layer || layer.dataset.url !== scr.url) {
+      layer && layer.remove();
+      layer = doc.createElement("div");
+      layer.id = "psi-wall"; layer.dataset.url = scr.url;
+      const m = doc.createElement(scr.kind === "video" ? "video" : "img");
+      m.className = "psi-wall-media";
+      if (scr.kind === "video") { m.muted = true; m.loop = true; m.autoplay = true; m.playsInline = true; m.setAttribute("muted", ""); }
+      m.src = scr.url;
+      layer.appendChild(m);
+      doc.body.prepend(layer);
+    }
+    const css = `left:${scr.x - w.screenX}px;top:${scr.y - w.screenY}px;width:${scr.w}px;height:${scr.h}px`;
+    if (layer.style.cssText !== css) layer.style.cssText = css;
+    const v = layer.querySelector("video");
+    if (v) { if (doc.hidden) { if (!v.paused) v.pause(); } else if (v.paused) v.play().catch(() => {}); }   // skryté okno = video stojí
+  }
+
   async function windowWatchdog() {
     const pop = window.g_PopupManager && g_PopupManager.m_mapPopups.get("SP Desktop_uid0");
     const w = pop && pop.m_popup;
@@ -1271,6 +1325,7 @@
   const libTimer = setInterval(libraryTick, 500);
   const extraTimer = setInterval(() => { try { libraryExtras(); } catch (e) {} try { downloadsExtras(); } catch (e) {} }, 800);
   const wdTimer = setInterval(() => { windowWatchdog().catch(() => {}); }, 2000);
+  const glassTimer = setInterval(() => { glassWindow().catch(() => {}); }, 600);
   window.__psiCleanup = () => {
     active = false;
     try { window.__psiScrollOff && window.__psiScrollOff(); } catch (e) {}
@@ -1281,6 +1336,7 @@
     clearInterval(libTimer);
     clearInterval(extraTimer);
     clearInterval(wdTimer);
+    clearInterval(glassTimer);
     for (const p of (window.g_PopupManager && g_PopupManager.m_mapPopups ? g_PopupManager.m_mapPopups.values() : [])) {
       const doc = p.m_popup && p.m_popup.document;
       if (!doc) continue;

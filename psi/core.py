@@ -117,6 +117,7 @@ DEFAULT_FEATURES = {
     "community": True,      # vitrína „Môj týždeň“ na profile
     "companion_lan": True,  # Companion dostupný z mobilu v domácej sieti
     "dock_icons": True,     # ikony hier v doku / paneli úloh (skryté .desktop záznamy)
+    "glass_window": False,  # priehľadné okno Steamu – za ním tapeta plochy
 }
 
 
