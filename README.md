@@ -21,6 +21,8 @@ Wishlist items get small rating badges, and KDE notifies you when one of them go
 For the look, there are rounded corners, a theme editor (accent colour, panel colour, blur, corner
 radius), custom fonts, your own CSS, and Millennium themes (CSS only, their JavaScript never runs).
 The downloads page shows how much is left, the time remaining and the free disk space.
+Running games also get their real icon in the dock and taskbar instead of a blank one (PSI writes
+hidden `.desktop` entries with `StartupWMClass=steam_app_<appid>` for every installed game).
 
 PSI follows Steam's language (English or Slovak) and you can switch it under
 *Steam → Settings → PSI*, where every feature has its own toggle. It updates itself from this

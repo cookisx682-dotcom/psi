@@ -116,6 +116,7 @@ DEFAULT_FEATURES = {
     "store": True,          # ProtonDB + zľavy na stránke hry v obchode
     "community": True,      # vitrína „Môj týždeň“ na profile
     "companion_lan": True,  # Companion dostupný z mobilu v domácej sieti
+    "dock_icons": True,     # ikony hier v doku / paneli úloh (skryté .desktop záznamy)
 }
 
 

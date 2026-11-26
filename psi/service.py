@@ -273,6 +273,10 @@ class Psi:
     def set_feature(self, name: str, value: bool) -> dict:
         f = core.set_feature(name, value)
         self._changed()
+        if name == "dock_icons":
+            from . import icons
+            threading.Thread(target=(lambda: icons.sync({a: {} for a in icons.installed_appids()})) if value else icons.remove_all,
+                             daemon=True).start()
         if self.companion and name == "companion_lan":
             self.companion.wake()
         return f
@@ -848,6 +852,9 @@ def main() -> None:
     threading.Thread(target=snapshot_loop, daemon=True, name="psi-snapshots").start()
     threading.Thread(target=deal_loop, args=(psi,), daemon=True, name="psi-deals").start()
     threading.Thread(target=update_loop, daemon=True, name="psi-update").start()
+    from . import icons
+    threading.Thread(target=icons.loop, args=(lambda: core.features().get("dock_icons", True),),
+                     daemon=True, name="psi-icons").start()
     inj = Injector(psi)
     inj.start()
     bw = BrowserWatch(inj)

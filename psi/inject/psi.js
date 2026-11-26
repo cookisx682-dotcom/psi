@@ -3,7 +3,7 @@
  * UI: sekcia „PSI“ v Steam → Nastavenia (klon natívnej záložky + vlastný panel). */
 (function () {
   "use strict";
-  const VERSION = "1.64";
+  const VERSION = "1.65";
   if (window.__psiLoaded === VERSION) return;
   // staršia verzia (po aktualizácii PSI) – uprac jej UI a časovače
   try { window.__psiCleanup && window.__psiCleanup(); } catch (e) {}
@@ -148,6 +148,7 @@
     ["library", tr("ProtonDB v knižnici", "ProtonDB in the library"), tr("Pri každej hre v knižnici: medaila ProtonDB (Platinum, Gold…) alebo „Natívne“, ak má hra Linux verziu.", "Next to every game: its ProtonDB medal (Platinum, Gold…) or “Native” if it has a Linux build.")],
     ["store", tr("ProtonDB a zľavy v obchode", "ProtonDB and prices in the store"), tr("Na stránke hry: medaila, odpočet konca zľavy, odhad zľavy a odporúčanie kúp/počkaj.", "On game pages: the medal, sale countdown, expected discount and a buy / wait hint.")],
     ["community", tr("Vitrína „Môj týždeň“", "“My week” showcase"), tr("Na tvojom Steam profile: hodiny, hra týždňa a odznaky. Vidíš ju len ty.", "On your Steam profile: hours played, game of the week and badges. Only you can see it.")],
+    ["dock_icons", tr("Ikony hier v doku", "Game icons in the dock"), tr("Spustená hra má v doku a paneli úloh svoju ikonu namiesto prázdnej. Pre všetky nainštalované hry, v menu aplikácií sa neukážu.", "A running game shows its own icon in the dock and taskbar instead of a blank one. For every installed game; they don't appear in the app menu.")],
     ["companion_lan", tr("Companion pre mobil", "Companion for your phone"), tr("Prístup z telefónu v domácej Wi-Fi. Na tomto PC beží Companion vždy.", "Access from your phone on home Wi-Fi. On this PC the Companion always runs.")],
   ];
 
